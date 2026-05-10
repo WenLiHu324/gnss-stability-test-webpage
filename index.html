@@ -1437,15 +1437,15 @@
       const mqttRecords = sortByTime(session.mqttRecords, "timestamp");
       const validMqttRecords = pairedRows.map((row) => row.mqtt);
       const validMqttIds = new Set(validMqttRecords.map((record) => record.id));
-      const phoneRecords = pairedRows.map((row) => row.phone);
+      const phoneRecords = sortPhonesByCollectionTime(session.phoneRecords).filter(isCoordinateFinite);
       const validForOrigin = [...phoneRecords, ...validMqttRecords];
       if (!validForOrigin.length) {
         if (!trajectoryView.hasDrawing) {
           ctx.fillStyle = "#697589";
           ctx.font = "14px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
-          ctx.fillText("暂无 5 秒内对齐的轨迹点。", 18, 32);
+          ctx.fillText("暂无可绘制的手机或 MQTT 坐标。", 18, 32);
         }
-        els.trajectorySummary.textContent = `暂无 ${MAX_VISUAL_TIME_DELTA_S} 秒内对齐的轨迹点，原始数据仍在表格中保留。`;
+        els.trajectorySummary.textContent = "暂无可绘制的手机或 MQTT 坐标，原始数据仍在表格中保留。";
         return;
       }
 
@@ -1458,7 +1458,7 @@
         phone: projectPoint(row.phone, origin),
         mqtt: projectPoint(row.mqtt, origin)
       }));
-      const phonePoints = pairedPoints.map((pair) => pair.phone);
+      const phonePoints = phoneRecords.map((record) => projectPoint(record, origin));
       const mqttPoints = pairedPoints.map((pair) => pair.mqtt);
       const phoneByMqttId = alignment.byMqttId;
       const invalidPoints = mqttRecords
@@ -1487,6 +1487,7 @@
       trajectoryView.centerX = (minX + maxX) / 2;
       trajectoryView.centerY = (minY + maxY) / 2;
 
+      const latestPhonePoint = phonePoints.at(-1) || null;
       const latestPair = pairedPoints.at(-1) || null;
       const latestCenter = latestPair
         ? {
@@ -1494,7 +1495,7 @@
             y: (latestPair.phone.y + latestPair.mqtt.y) / 2,
             record: latestPair.row.phone
           }
-        : null;
+        : latestPhonePoint;
       if (!preserveView || !trajectoryView.autoFollowPaused || sessionChanged || reset) {
         const scale = trajectoryView.baseScale * trajectoryView.scale;
         if (latestCenter && Number.isFinite(scale) && scale > 0) {
@@ -1555,11 +1556,13 @@
       if (latestPair) {
         drawLatestMarker(ctx, latestPair.phone, toScreen);
         drawLatestMarker(ctx, latestPair.mqtt, toScreen);
+      } else {
+        drawLatestMarker(ctx, latestPhonePoint, toScreen);
       }
 
       const alignedCount = alignment.rows.filter((row) => row.mqtt).length;
       const missingCount = alignment.rows.length - alignedCount;
-      els.trajectorySummary.textContent = `${MAX_VISUAL_TIME_DELTA_S}s内对齐 ${alignedCount}/${alignment.rows.length} 条，超时不入图 ${missingCount} 条；MQTT有效点 ${validMqttRecords.length} 个，MQTT NaN点 ${invalidPoints.length} 个。`;
+      els.trajectorySummary.textContent = `手机点 ${phonePoints.length} 个；${MAX_VISUAL_TIME_DELTA_S}s内对齐 ${alignedCount}/${alignment.rows.length} 条，超时不入图 ${missingCount} 条；MQTT有效点 ${validMqttRecords.length} 个，MQTT NaN点 ${invalidPoints.length} 个。`;
       trajectoryView.hasDrawing = true;
     }
 
