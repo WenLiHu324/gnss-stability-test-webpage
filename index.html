@@ -442,6 +442,14 @@
       background: #9aa3ad;
     }
 
+    .viz-swatch.latest-phone {
+      background: #111827;
+    }
+
+    .viz-swatch.latest-mqtt {
+      background: #7c3aed;
+    }
+
     @media (max-width: 820px) {
       main {
         padding: 12px;
@@ -599,6 +607,8 @@
         <div class="viz-legend">
           <span class="viz-key"><span class="viz-swatch phone"></span>手机轨迹</span>
           <span class="viz-key"><span class="viz-swatch mqtt"></span>MQTT 有效轨迹</span>
+          <span class="viz-key"><span class="viz-swatch latest-phone"></span>最新手机段</span>
+          <span class="viz-key"><span class="viz-swatch latest-mqtt"></span>最新MQTT段</span>
           <span class="viz-key"><span class="viz-swatch invalid"></span>MQTT NaN 点</span>
         </div>
       </div>
@@ -1416,13 +1426,13 @@
       }
 
       const alignment = buildAlignedRecords(session);
-      const alignedPhones = alignment.rows.filter((row) => row.mqtt).map((row) => row.phone).filter(isCoordinateFinite);
+      const pairedRows = alignment.rows
+        .filter((row) => row.mqtt && isValidMqttPoint(row.mqtt) && isCoordinateFinite(row.phone))
+        .sort((a, b) => toDate(phoneTimeValue(a.phone)) - toDate(phoneTimeValue(b.phone)));
       const mqttRecords = sortByTime(session.mqttRecords, "timestamp");
-      const validMqttRecords = alignment.rows
-        .filter((row) => row.mqtt && isValidMqttPoint(row.mqtt))
-        .map((row) => row.mqtt);
+      const validMqttRecords = pairedRows.map((row) => row.mqtt);
       const validMqttIds = new Set(validMqttRecords.map((record) => record.id));
-      const phoneRecords = alignedPhones;
+      const phoneRecords = pairedRows.map((row) => row.phone);
       const validForOrigin = [...phoneRecords, ...validMqttRecords];
       if (!validForOrigin.length) {
         if (!trajectoryView.hasDrawing) {
@@ -1438,8 +1448,13 @@
         lat: validForOrigin.reduce((sum, item) => sum + Number(item.latitude), 0) / validForOrigin.length,
         lon: validForOrigin.reduce((sum, item) => sum + Number(item.longitude), 0) / validForOrigin.length
       };
-      const phonePoints = phoneRecords.map((record) => projectPoint(record, origin));
-      const mqttPoints = validMqttRecords.map((record) => projectPoint(record, origin));
+      const pairedPoints = pairedRows.map((row) => ({
+        row,
+        phone: projectPoint(row.phone, origin),
+        mqtt: projectPoint(row.mqtt, origin)
+      }));
+      const phonePoints = pairedPoints.map((pair) => pair.phone);
+      const mqttPoints = pairedPoints.map((pair) => pair.mqtt);
       const phoneByMqttId = alignment.byMqttId;
       const invalidPoints = mqttRecords
         .filter((record) => isMqttNanPoint(record) && !validMqttIds.has(record.id))
@@ -1467,14 +1482,19 @@
       trajectoryView.centerX = (minX + maxX) / 2;
       trajectoryView.centerY = (minY + maxY) / 2;
 
-      const latestPoint = [...phonePoints, ...mqttPoints]
-        .sort((a, b) => toDate(a.record.timestamp) - toDate(b.record.timestamp))
-        .at(-1);
+      const latestPair = pairedPoints.at(-1) || null;
+      const latestCenter = latestPair
+        ? {
+            x: (latestPair.phone.x + latestPair.mqtt.x) / 2,
+            y: (latestPair.phone.y + latestPair.mqtt.y) / 2,
+            record: latestPair.row.phone
+          }
+        : null;
       if (!preserveView || !trajectoryView.userScaleTouched || sessionChanged || reset) {
         const scale = trajectoryView.baseScale * trajectoryView.scale;
-        if (latestPoint && Number.isFinite(scale) && scale > 0) {
-          trajectoryView.offsetX = -(latestPoint.x - trajectoryView.centerX) * scale;
-          trajectoryView.offsetY = (latestPoint.y - trajectoryView.centerY) * scale;
+        if (latestCenter && Number.isFinite(scale) && scale > 0) {
+          trajectoryView.offsetX = -(latestCenter.x - trajectoryView.centerX) * scale;
+          trajectoryView.offsetY = (latestCenter.y - trajectoryView.centerY) * scale;
         }
       }
 
@@ -1507,6 +1527,12 @@
       drawPath(ctx, mqttPoints, "#1f6fb2", toScreen);
       drawDirectionArrows(ctx, phonePoints, "#d93025", toScreen);
       drawDirectionArrows(ctx, mqttPoints, "#1f6fb2", toScreen);
+      if (phonePoints.length >= 2) {
+        drawPath(ctx, phonePoints.slice(-2), "#111827", toScreen);
+      }
+      if (mqttPoints.length >= 2) {
+        drawPath(ctx, mqttPoints.slice(-2), "#7c3aed", toScreen);
+      }
       phonePoints.forEach((point) => drawPoint(ctx, point, "#d93025", 3.8, toScreen));
       mqttPoints.forEach((point) => {
         const screen = drawPoint(ctx, point, "#1f6fb2", 5, toScreen);
@@ -1521,7 +1547,10 @@
         });
       });
       invalidPoints.forEach((point) => drawInvalidPoint(ctx, point, toScreen));
-      drawLatestMarker(ctx, latestPoint, toScreen);
+      if (latestPair) {
+        drawLatestMarker(ctx, latestPair.phone, toScreen);
+        drawLatestMarker(ctx, latestPair.mqtt, toScreen);
+      }
 
       const alignedCount = alignment.rows.filter((row) => row.mqtt).length;
       const missingCount = alignment.rows.length - alignedCount;
