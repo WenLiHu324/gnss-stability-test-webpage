@@ -615,6 +615,7 @@
       timeout: 10000,
       maximumAge: 0
     };
+    const MAX_VISUAL_TIME_DELTA_S = 5;
 
     const testCases = [
       "工况1：静态遮挡稳定性测试",
@@ -694,7 +695,10 @@
       dragStartX: 0,
       dragStartY: 0,
       dragOffsetX: 0,
-      dragOffsetY: 0
+      dragOffsetY: 0,
+      sessionId: "",
+      hasDrawing: false,
+      userScaleTouched: false
     };
 
     function loadState() {
@@ -802,7 +806,7 @@
             nearestDelta = delta;
           }
         }
-        const linkedMqtt = nearest && nearestDelta <= 10 ? nearest : null;
+        const linkedMqtt = nearest && nearestDelta <= MAX_VISUAL_TIME_DELTA_S ? nearest : null;
         const distance = linkedMqtt && isValidMqttPoint(linkedMqtt)
           ? haversineMeters(phone.latitude, phone.longitude, linkedMqtt.latitude, linkedMqtt.longitude)
           : null;
@@ -824,13 +828,13 @@
     }
 
     function eventStateForMqtt(session, mqttRecord) {
-      if (mqttRecord.event || mqttRecord.status) {
-        return [mqttRecord.event, mqttRecord.status].filter(Boolean).join(" / ");
-      }
-      const mark = sortByTime(session?.marks || [], "timestamp")
-        .filter((item) => toDate(item.timestamp) <= toDate(mqttRecord.timestamp))
-        .at(-1);
-      return mark ? `${mark.type}：${mark.label}` : "无事件";
+      const marks = sortByTime(session?.marks || [], "timestamp")
+        .filter((item) => toDate(item.timestamp) <= toDate(mqttRecord.timestamp));
+      const scene = marks.filter((item) => item.type === "场景标注").at(-1)?.label || "";
+      const action = marks.filter((item) => item.type === "动作标注").at(-1)?.label || "";
+      if (scene && action) return `${scene} ${action}`;
+      if (scene || action) return scene || action;
+      return "未标注场景/动作";
     }
 
     function projectPoint(record, origin) {
@@ -1191,7 +1195,7 @@
         option.textContent = `${session.name} ${session.endedAt ? "(已结束)" : "(进行中)"}`;
         els.sessionSelect.appendChild(option);
       }
-      selectedSessionId = state.sessions.some((item) => item.id === current) ? current : (activeSessionId || state.sessions.at(-1).id);
+      selectedSessionId = activeSessionId || (state.sessions.some((item) => item.id === current) ? current : state.sessions.at(-1).id);
       els.sessionSelect.value = selectedSessionId;
     }
 
@@ -1302,6 +1306,29 @@
       ctx.stroke();
     }
 
+    function drawDirectionArrows(ctx, points, color, toScreen) {
+      if (points.length < 2) return;
+      const step = Math.max(1, Math.floor(points.length / 8));
+      for (let index = 1; index < points.length; index += step) {
+        const from = toScreen(points[index - 1]);
+        const to = toScreen(points[index]);
+        const angle = Math.atan2(to.y - from.y, to.x - from.x);
+        if (!Number.isFinite(angle) || Math.hypot(to.x - from.x, to.y - from.y) < 8) continue;
+        ctx.save();
+        ctx.translate(to.x, to.y);
+        ctx.rotate(angle);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(-9, -5);
+        ctx.lineTo(-9, 5);
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.globalAlpha = 0.86;
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
     function drawPoint(ctx, point, color, radius, toScreen, stroke = "#ffffff") {
       const screen = toScreen(point);
       ctx.beginPath();
@@ -1312,6 +1339,18 @@
       ctx.strokeStyle = stroke;
       ctx.stroke();
       return screen;
+    }
+
+    function drawLatestMarker(ctx, point, toScreen) {
+      if (!point) return;
+      const screen = toScreen(point);
+      ctx.beginPath();
+      ctx.arc(screen.x, screen.y, 11, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(20, 115, 230, 0.12)";
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "#1473e6";
+      ctx.stroke();
     }
 
     function drawInvalidPoint(ctx, point, toScreen) {
@@ -1334,7 +1373,8 @@
       return screen;
     }
 
-    function renderTrajectory(session, keepView = false) {
+    function renderTrajectory(session, options = {}) {
+      const { reset = false, preserveView = true } = options;
       const { width, height, ratio } = resizeTrajectoryCanvas();
       const canvas = els.trajectoryCanvas;
       const ctx = canvas.getContext("2d");
@@ -1343,24 +1383,40 @@
       els.trajectoryPopup.classList.add("hidden");
       trajectoryView.pointIndex = [];
 
+      const sessionChanged = trajectoryView.sessionId !== (session?.id || "");
+      if (sessionChanged || reset) {
+        trajectoryView.sessionId = session?.id || "";
+        trajectoryView.scale = 2.8;
+        trajectoryView.offsetX = 0;
+        trajectoryView.offsetY = 0;
+        trajectoryView.userScaleTouched = false;
+      }
+
       if (!session || (!session.phoneRecords.length && !session.mqttRecords.length)) {
         ctx.fillStyle = "#697589";
         ctx.font = "14px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
         ctx.fillText("暂无轨迹数据。", 18, 32);
         els.trajectorySummary.textContent = "等待可视化数据。";
+        trajectoryView.hasDrawing = false;
         return;
       }
 
       const alignment = buildAlignedRecords(session);
-      const phoneRecords = sortByTime(session.phoneRecords, "timestamp").filter(isCoordinateFinite);
+      const alignedPhones = alignment.rows.filter((row) => row.mqtt).map((row) => row.phone).filter(isCoordinateFinite);
       const mqttRecords = sortByTime(session.mqttRecords, "timestamp");
-      const validMqttRecords = mqttRecords.filter(isValidMqttPoint);
+      const validMqttRecords = alignment.rows
+        .filter((row) => row.mqtt && isValidMqttPoint(row.mqtt))
+        .map((row) => row.mqtt);
+      const validMqttIds = new Set(validMqttRecords.map((record) => record.id));
+      const phoneRecords = alignedPhones;
       const validForOrigin = [...phoneRecords, ...validMqttRecords];
       if (!validForOrigin.length) {
-        ctx.fillStyle = "#697589";
-        ctx.font = "14px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
-        ctx.fillText("暂无有效经纬度可绘制。", 18, 32);
-        els.trajectorySummary.textContent = "暂无有效经纬度可绘制。";
+        if (!trajectoryView.hasDrawing) {
+          ctx.fillStyle = "#697589";
+          ctx.font = "14px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
+          ctx.fillText("暂无 5 秒内对齐的轨迹点。", 18, 32);
+        }
+        els.trajectorySummary.textContent = `暂无 ${MAX_VISUAL_TIME_DELTA_S} 秒内对齐的轨迹点，原始数据仍在表格中保留。`;
         return;
       }
 
@@ -1372,12 +1428,12 @@
       const mqttPoints = validMqttRecords.map((record) => projectPoint(record, origin));
       const phoneByMqttId = alignment.byMqttId;
       const invalidPoints = mqttRecords
-        .filter(isMqttNanPoint)
+        .filter((record) => isMqttNanPoint(record) && !validMqttIds.has(record.id))
         .map((record) => {
           const aligned = phoneByMqttId.get(record.id);
           const markerSource = aligned?.phone || phoneRecords.reduce((best, phone) => {
             const delta = Math.abs(toDate(phone.timestamp) - toDate(record.timestamp)) / 1000;
-            return delta <= 10 && (!best || delta < best.delta) ? { phone, delta } : best;
+            return delta <= MAX_VISUAL_TIME_DELTA_S && (!best || delta < best.delta) ? { phone, delta } : best;
           }, null)?.phone;
           return markerSource ? { ...projectPoint(markerSource, origin), record } : null;
         })
@@ -1393,14 +1449,20 @@
       const spanY = Math.max(1, maxY - minY);
       const padding = 42;
 
-      if (!keepView) {
-        trajectoryView.scale = 1;
-        trajectoryView.offsetX = 0;
-        trajectoryView.offsetY = 0;
-      }
       trajectoryView.baseScale = Math.min((width - padding * 2) / spanX, (height - padding * 2) / spanY);
       trajectoryView.centerX = (minX + maxX) / 2;
       trajectoryView.centerY = (minY + maxY) / 2;
+
+      const latestPoint = [...phonePoints, ...mqttPoints]
+        .sort((a, b) => toDate(a.record.timestamp) - toDate(b.record.timestamp))
+        .at(-1);
+      if (!preserveView || !trajectoryView.userScaleTouched || sessionChanged || reset) {
+        const scale = trajectoryView.baseScale * trajectoryView.scale;
+        if (latestPoint && Number.isFinite(scale) && scale > 0) {
+          trajectoryView.offsetX = -(latestPoint.x - trajectoryView.centerX) * scale;
+          trajectoryView.offsetY = (latestPoint.y - trajectoryView.centerY) * scale;
+        }
+      }
 
       const toScreen = (point) => {
         const scale = trajectoryView.baseScale * trajectoryView.scale;
@@ -1429,6 +1491,8 @@
 
       drawPath(ctx, phonePoints, "#d93025", toScreen);
       drawPath(ctx, mqttPoints, "#1f6fb2", toScreen);
+      drawDirectionArrows(ctx, phonePoints, "#d93025", toScreen);
+      drawDirectionArrows(ctx, mqttPoints, "#1f6fb2", toScreen);
       phonePoints.forEach((point) => drawPoint(ctx, point, "#d93025", 3.8, toScreen));
       mqttPoints.forEach((point) => {
         const screen = drawPoint(ctx, point, "#1f6fb2", 5, toScreen);
@@ -1443,10 +1507,12 @@
         });
       });
       invalidPoints.forEach((point) => drawInvalidPoint(ctx, point, toScreen));
+      drawLatestMarker(ctx, latestPoint, toScreen);
 
       const alignedCount = alignment.rows.filter((row) => row.mqtt).length;
       const missingCount = alignment.rows.length - alignedCount;
-      els.trajectorySummary.textContent = `时间对齐 ${alignedCount}/${alignment.rows.length} 条，缺失保留 NaN ${missingCount} 条；MQTT有效点 ${validMqttRecords.length} 个，MQTT NaN点 ${invalidPoints.length} 个。`;
+      els.trajectorySummary.textContent = `${MAX_VISUAL_TIME_DELTA_S}s内对齐 ${alignedCount}/${alignment.rows.length} 条，超时不入图 ${missingCount} 条；MQTT有效点 ${validMqttRecords.length} 个，MQTT NaN点 ${invalidPoints.length} 个。`;
+      trajectoryView.hasDrawing = true;
     }
 
     function render() {
@@ -1642,7 +1708,7 @@
     }
 
     function renderTrajectoryWithCurrentView() {
-      renderTrajectory(selectedSession(), true);
+      renderTrajectory(selectedSession(), { preserveView: true });
     }
 
     function showTrajectoryPopup(point, x, y) {
@@ -1680,11 +1746,13 @@
     function handleTrajectoryWheel(event) {
       event.preventDefault();
       const factor = event.deltaY < 0 ? 1.18 : 0.85;
+      trajectoryView.userScaleTouched = true;
       trajectoryView.scale = Math.max(0.25, Math.min(24, trajectoryView.scale * factor));
       renderTrajectoryWithCurrentView();
     }
 
     function beginTrajectoryDrag(event) {
+      trajectoryView.userScaleTouched = true;
       trajectoryView.isDragging = true;
       trajectoryView.dragStartX = event.clientX;
       trajectoryView.dragStartY = event.clientY;
@@ -1709,6 +1777,7 @@
     }
 
     function zoomTrajectory(factor) {
+      trajectoryView.userScaleTouched = true;
       trajectoryView.scale = Math.max(0.25, Math.min(24, trajectoryView.scale * factor));
       renderTrajectoryWithCurrentView();
     }
@@ -1748,14 +1817,14 @@
     els.deleteButton.addEventListener("click", deleteSelectedSession);
     els.zoomInButton.addEventListener("click", () => zoomTrajectory(1.25));
     els.zoomOutButton.addEventListener("click", () => zoomTrajectory(0.8));
-    els.resetViewButton.addEventListener("click", () => renderTrajectory(selectedSession()));
+    els.resetViewButton.addEventListener("click", () => renderTrajectory(selectedSession(), { reset: true, preserveView: false }));
     els.trajectoryCanvas.addEventListener("click", handleTrajectoryClick);
     els.trajectoryCanvas.addEventListener("wheel", handleTrajectoryWheel, { passive: false });
     els.trajectoryCanvas.addEventListener("pointerdown", beginTrajectoryDrag);
     els.trajectoryCanvas.addEventListener("pointermove", moveTrajectoryDrag);
     els.trajectoryCanvas.addEventListener("pointerup", endTrajectoryDrag);
     els.trajectoryCanvas.addEventListener("pointercancel", endTrajectoryDrag);
-    window.addEventListener("resize", () => renderTrajectory(selectedSession()));
+    window.addEventListener("resize", () => renderTrajectory(selectedSession(), { preserveView: true }));
     els.sessionSelect.addEventListener("change", () => {
       selectedSessionId = els.sessionSelect.value;
       render();
