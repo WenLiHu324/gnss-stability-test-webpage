@@ -625,7 +625,7 @@
       timeout: 10000,
       maximumAge: 0
     };
-    const MAX_VISUAL_TIME_DELTA_S = 10;
+    const MAX_VISUAL_TIME_DELTA_S = 15;
 
     const testCases = [
       "工况1：静态遮挡稳定性测试",
@@ -767,7 +767,7 @@
     }
 
     function mqttTimeValue(record) {
-      return record?.receivedAt || record?.timestamp || "";
+      return record?.timestamp || record?.receivedAt || "";
     }
 
     function sortPhonesByCollectionTime(items) {
@@ -815,7 +815,7 @@
 
     function buildAlignedRecords(session) {
       const phones = sortPhonesByCollectionTime(session?.phoneRecords || []);
-      const mqttRecords = sortByTime(session?.mqttRecords || [], "receivedAt");
+      const mqttRecords = sortByTime(session?.mqttRecords || [], "timestamp");
       const byMqttId = new Map();
       const rows = phones.map((phone) => {
         const phoneTime = toDate(phoneTimeValue(phone)).getTime();
@@ -1765,13 +1765,17 @@
     function showTrajectoryPopup(point, x, y) {
       const precision = hdopPrecisionPercent(point.record.hdop);
       const distance = point.aligned?.distanceM;
+      const timeDelta = point.aligned?.timeDeltaS;
+      const phoneTime = point.aligned?.phone ? phoneTimeValue(point.aligned.phone) : "";
       els.trajectoryPopup.innerHTML = `
         <strong>MQTT Loop ${point.record.loop || "--"}</strong>
         <div>HDOP 精度指标：${precision == null ? "NaN" : `${precision}%`}</div>
         <div>Haversine 误差：${distance == null ? "NaN" : `${distance} m`}</div>
+        <div>时间差：${timeDelta == null ? "NaN" : `${timeDelta}s`}</div>
         <div>事件状态：${point.eventState}</div>
         <div>有效卫星数：${point.record.usedSatellites || "NaN"}</div>
-        <div>时间：${formatDate(point.record.timestamp)}</div>
+        <div>GNSS采集时间：${formatDate(point.record.timestamp)}</div>
+        <div>手机采集时间：${formatDate(phoneTime)}</div>
       `;
       const rect = els.trajectoryWrap.getBoundingClientRect();
       const popupWidth = 260;
