@@ -518,10 +518,23 @@
         <button class="danger" id="deleteButton" type="button">删除所选轮</button>
       </div>
       <div class="backup-grid" aria-label="远程备份">
-        <label>远程备份地址
+        <label>备份方式
+          <select id="backupModeSelect">
+            <option value="">关闭</option>
+            <option value="supabase">Supabase</option>
+            <option value="post">自定义 POST</option>
+          </select>
+        </label>
+        <label>Supabase Project URL
+          <input id="supabaseUrlInput" placeholder="https://xxxx.supabase.co">
+        </label>
+        <label>Supabase anon key
+          <input id="supabaseKeyInput" placeholder="粘贴 anon public key">
+        </label>
+        <label>自定义 POST 地址
           <input id="backupUrlInput" placeholder="例如 https://your-domain.example/api/ingest">
         </label>
-        <button class="ghost" id="saveBackupButton" type="button">保存备份地址</button>
+        <button class="ghost" id="saveBackupButton" type="button">保存备份配置</button>
         <button class="ghost" id="testBackupButton" type="button">测试备份</button>
       </div>
       <div class="backup-status" id="backupStatus">远程备份默认关闭；不填写地址时不会上传任何数据。</div>
@@ -644,7 +657,10 @@
     const MQTT_BROKER_URL = "wss://broker.emqx.io:8084/mqtt";
     const MQTT_TOPIC = "device/gnss/#";
     const STORAGE_KEY = "gnss-stability-test-v3";
+    const BACKUP_MODE_KEY = "gnss-stability-backup-mode-v1";
     const BACKUP_URL_KEY = "gnss-stability-backup-url-v1";
+    const SUPABASE_URL_KEY = "gnss-stability-supabase-url-v1";
+    const SUPABASE_ANON_KEY = "gnss-stability-supabase-anon-key-v1";
     const PHONE_OPTIONS = {
       enableHighAccuracy: true,
       timeout: 10000,
@@ -683,7 +699,10 @@
       exportCsvButton: document.querySelector("#exportCsvButton"),
       exportJsonButton: document.querySelector("#exportJsonButton"),
       deleteButton: document.querySelector("#deleteButton"),
+      backupModeSelect: document.querySelector("#backupModeSelect"),
       backupUrlInput: document.querySelector("#backupUrlInput"),
+      supabaseUrlInput: document.querySelector("#supabaseUrlInput"),
+      supabaseKeyInput: document.querySelector("#supabaseKeyInput"),
       saveBackupButton: document.querySelector("#saveBackupButton"),
       testBackupButton: document.querySelector("#testBackupButton"),
       backupStatus: document.querySelector("#backupStatus"),
@@ -722,7 +741,10 @@
     let lastMqtt = null;
     let lastPhone = null;
     let pendingMqttRecordId = null;
+    let backupMode = localStorage.getItem(BACKUP_MODE_KEY) || "";
     let backupUrl = localStorage.getItem(BACKUP_URL_KEY) || "";
+    let supabaseUrl = localStorage.getItem(SUPABASE_URL_KEY) || "";
+    let supabaseAnonKey = localStorage.getItem(SUPABASE_ANON_KEY) || "";
     const trajectoryView = {
       scale: 1,
       offsetX: 0,
@@ -759,19 +781,37 @@
       els.backupStatus.style.color = isError ? "#803030" : "#5d687a";
     }
 
+    function supabaseEndpoint() {
+      return `${supabaseUrl.replace(/\/+$/, "")}/rest/v1/gnss_events`;
+    }
+
     function saveBackupUrl() {
+      backupMode = els.backupModeSelect.value;
       backupUrl = els.backupUrlInput.value.trim();
-      if (backupUrl) {
+      supabaseUrl = els.supabaseUrlInput.value.trim();
+      supabaseAnonKey = els.supabaseKeyInput.value.trim();
+      localStorage.setItem(BACKUP_MODE_KEY, backupMode);
+      if (backupMode === "supabase") {
+        localStorage.setItem(SUPABASE_URL_KEY, supabaseUrl);
+        localStorage.setItem(SUPABASE_ANON_KEY, supabaseAnonKey);
+        setBackupStatus(supabaseUrl && supabaseAnonKey
+          ? `Supabase 备份已开启：${supabaseUrl}`
+          : "Supabase 备份配置不完整，请填写 Project URL 和 anon key。", !(supabaseUrl && supabaseAnonKey));
+      } else if (backupMode === "post" && backupUrl) {
         localStorage.setItem(BACKUP_URL_KEY, backupUrl);
-        setBackupStatus(`远程备份已开启：${backupUrl}`);
+        setBackupStatus(`自定义 POST 备份已开启：${backupUrl}`);
       } else {
+        backupMode = "";
+        localStorage.removeItem(BACKUP_MODE_KEY);
         localStorage.removeItem(BACKUP_URL_KEY);
+        localStorage.removeItem(SUPABASE_URL_KEY);
+        localStorage.removeItem(SUPABASE_ANON_KEY);
         setBackupStatus("远程备份已关闭；当前数据仍只保存在本机浏览器。");
       }
     }
 
     function backupPayload(kind, session, payload) {
-      if (!backupUrl || !session) return;
+      if (!backupMode || !session) return;
       const body = {
         kind,
         savedAt: new Date().toISOString(),
@@ -786,10 +826,30 @@
         },
         payload
       };
-      fetch(backupUrl, {
+      const target = backupMode === "supabase" ? supabaseEndpoint() : backupUrl;
+      if (!target || (backupMode === "supabase" && !supabaseAnonKey)) return;
+      const headers = backupMode === "supabase"
+        ? {
+            "Content-Type": "application/json",
+            apikey: supabaseAnonKey,
+            Authorization: `Bearer ${supabaseAnonKey}`,
+            Prefer: "return=minimal"
+          }
+        : { "Content-Type": "application/json" };
+      const requestBody = backupMode === "supabase"
+        ? JSON.stringify({
+            kind: body.kind,
+            saved_at: body.savedAt,
+            session_id: body.session.id,
+            session: body.session,
+            payload: body.payload,
+            client: { userAgent: navigator.userAgent }
+          })
+        : JSON.stringify(body);
+      fetch(target, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        headers,
+        body: requestBody,
         keepalive: true
       })
         .then((response) => {
@@ -803,8 +863,8 @@
 
     function testBackup() {
       saveBackupUrl();
-      if (!backupUrl) {
-        setBackupStatus("请先填写远程备份地址。", true);
+      if (!backupMode) {
+        setBackupStatus("请先选择并填写远程备份配置。", true);
         return;
       }
       const pseudoSession = selectedSession() || activeSession() || {
@@ -2057,8 +2117,19 @@
     }
 
     function initOptions() {
+      els.backupModeSelect.value = backupMode;
       els.backupUrlInput.value = backupUrl;
-      setBackupStatus(backupUrl ? `远程备份已开启：${backupUrl}` : "远程备份默认关闭；不填写地址时不会上传任何数据。");
+      els.supabaseUrlInput.value = supabaseUrl;
+      els.supabaseKeyInput.value = supabaseAnonKey;
+      if (backupMode === "supabase") {
+        setBackupStatus(supabaseUrl && supabaseAnonKey
+          ? `Supabase 备份已开启：${supabaseUrl}`
+          : "Supabase 备份配置不完整，请填写 Project URL 和 anon key。", !(supabaseUrl && supabaseAnonKey));
+      } else if (backupMode === "post" && backupUrl) {
+        setBackupStatus(`自定义 POST 备份已开启：${backupUrl}`);
+      } else {
+        setBackupStatus("远程备份默认关闭；不填写地址时不会上传任何数据。");
+      }
       for (const item of testCases) {
         const option = document.createElement("option");
         option.value = item;
