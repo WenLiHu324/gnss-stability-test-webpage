@@ -708,7 +708,7 @@
       dragOffsetY: 0,
       sessionId: "",
       hasDrawing: false,
-      userScaleTouched: false
+      autoFollowPaused: false
     };
 
     function loadState() {
@@ -1418,7 +1418,7 @@
         trajectoryView.scale = 2.8;
         trajectoryView.offsetX = 0;
         trajectoryView.offsetY = 0;
-        trajectoryView.userScaleTouched = false;
+        trajectoryView.autoFollowPaused = false;
       }
 
       if (!session || (!session.phoneRecords.length && !session.mqttRecords.length)) {
@@ -1495,7 +1495,7 @@
             record: latestPair.row.phone
           }
         : null;
-      if (!preserveView || !trajectoryView.userScaleTouched || sessionChanged || reset) {
+      if (!preserveView || !trajectoryView.autoFollowPaused || sessionChanged || reset) {
         const scale = trajectoryView.baseScale * trajectoryView.scale;
         if (latestCenter && Number.isFinite(scale) && scale > 0) {
           trajectoryView.offsetX = -(latestCenter.x - trajectoryView.centerX) * scale;
@@ -1797,13 +1797,12 @@
     function handleTrajectoryWheel(event) {
       event.preventDefault();
       const factor = event.deltaY < 0 ? 1.18 : 0.85;
-      trajectoryView.userScaleTouched = true;
       trajectoryView.scale = Math.max(0.25, Math.min(24, trajectoryView.scale * factor));
       renderTrajectoryWithCurrentView();
     }
 
     function beginTrajectoryDrag(event) {
-      trajectoryView.userScaleTouched = true;
+      trajectoryView.autoFollowPaused = true;
       trajectoryView.isDragging = true;
       trajectoryView.dragStartX = event.clientX;
       trajectoryView.dragStartY = event.clientY;
@@ -1828,7 +1827,6 @@
     }
 
     function zoomTrajectory(factor) {
-      trajectoryView.userScaleTouched = true;
       trajectoryView.scale = Math.max(0.25, Math.min(24, trajectoryView.scale * factor));
       renderTrajectoryWithCurrentView();
     }
