@@ -752,6 +752,14 @@
       return Number.isNaN(date.getTime()) ? new Date() : date;
     }
 
+    function phoneTimeValue(phone) {
+      return phone?.receivedAt || phone?.timestamp || "";
+    }
+
+    function sortPhonesByCollectionTime(items) {
+      return [...items].sort((a, b) => toDate(phoneTimeValue(a)) - toDate(phoneTimeValue(b)));
+    }
+
     function haversineMeters(aLat, aLon, bLat, bLon) {
       const nums = [aLat, aLon, bLat, bLon].map(Number);
       if (!nums.every(Number.isFinite)) {
@@ -792,11 +800,11 @@
     }
 
     function buildAlignedRecords(session) {
-      const phones = sortByTime(session?.phoneRecords || [], "timestamp");
+      const phones = sortPhonesByCollectionTime(session?.phoneRecords || []);
       const mqttRecords = sortByTime(session?.mqttRecords || [], "timestamp");
       const byMqttId = new Map();
       const rows = phones.map((phone) => {
-        const phoneTime = toDate(phone.timestamp).getTime();
+        const phoneTime = toDate(phoneTimeValue(phone)).getTime();
         let nearest = null;
         let nearestDelta = Infinity;
         for (const mqttRecord of mqttRecords) {
@@ -813,7 +821,7 @@
         const row = {
           phone,
           mqtt: linkedMqtt,
-          timeDeltaS: linkedMqtt ? Math.round((toDate(phone.timestamp) - toDate(linkedMqtt.timestamp)) / 1000) : null,
+          timeDeltaS: linkedMqtt ? Math.round((toDate(phoneTimeValue(phone)) - toDate(linkedMqtt.timestamp)) / 1000) : null,
           distanceM: Number.isFinite(distance) ? Math.round(distance * 10) / 10 : null
         };
         if (linkedMqtt) {
@@ -939,7 +947,7 @@
 
       if (linkedMqtt) {
         distance = haversineMeters(linkedMqtt.latitude, linkedMqtt.longitude, phone.latitude, phone.longitude);
-        timeDelta = Math.round((toDate(phone.timestamp) - toDate(linkedMqtt.timestamp)) / 1000);
+        timeDelta = Math.round((toDate(phoneTimeValue(phone)) - toDate(linkedMqtt.timestamp)) / 1000);
         if (Number.isFinite(distance) && distance > 50) alerts.push("手机对标误差超过50m");
         else if (Number.isFinite(distance) && distance > 20) alerts.push("手机对标误差超过20m");
         if (Math.abs(timeDelta) > 5) alerts.push("时间差超过5s");
@@ -1020,14 +1028,19 @@
       isPhoneLocating = true;
       navigator.geolocation.getCurrentPosition(
         (position) => {
+          const receivedAt = new Date().toISOString();
+          const geolocationTimestamp = position.timestamp
+            ? new Date(position.timestamp).toISOString()
+            : "";
           const session = activeSession();
           const linkedMqtt = session && pendingMqttRecordId
             ? session.mqttRecords.find((item) => item.id === pendingMqttRecordId)
             : lastMqtt;
           const phone = {
             id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-            timestamp: new Date(position.timestamp || Date.now()).toISOString(),
-            receivedAt: new Date().toISOString(),
+            timestamp: receivedAt,
+            receivedAt,
+            geolocationTimestamp,
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
             accuracy: position.coords.accuracy,
@@ -1234,9 +1247,10 @@
         els.phoneRecords.innerHTML = '<div class="empty">暂无手机定位数据。</div>';
         return;
       }
-      const rows = sortByTime(session.phoneRecords, "timestamp").map((item) => `
+      const rows = sortPhonesByCollectionTime(session.phoneRecords).map((item) => `
         <tr class="${item.level}">
-          <td>${formatDate(item.timestamp)}</td>
+          <td>${formatDate(phoneTimeValue(item))}</td>
+          <td>${item.geolocationTimestamp ? formatDate(item.geolocationTimestamp) : ""}</td>
           <td>${fixed(item.latitude)}</td>
           <td>${fixed(item.longitude)}</td>
           <td>${Number.isFinite(Number(item.accuracy)) ? Number(item.accuracy).toFixed(1) : "--"}</td>
@@ -1249,7 +1263,7 @@
       `).join("");
       els.phoneRecords.innerHTML = `
         <table>
-          <thead><tr><th>手机时间</th><th>纬度</th><th>经度</th><th>精度(m)</th><th>对应MQTT Loop</th><th>时间差(s)</th><th>对标误差(m)</th><th>判定</th><th>自动识别</th></tr></thead>
+          <thead><tr><th>采集时间</th><th>系统定位时间</th><th>纬度</th><th>经度</th><th>精度(m)</th><th>对应MQTT Loop</th><th>时间差(s)</th><th>对标误差(m)</th><th>判定</th><th>自动识别</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       `;
@@ -1432,7 +1446,7 @@
         .map((record) => {
           const aligned = phoneByMqttId.get(record.id);
           const markerSource = aligned?.phone || phoneRecords.reduce((best, phone) => {
-            const delta = Math.abs(toDate(phone.timestamp) - toDate(record.timestamp)) / 1000;
+            const delta = Math.abs(toDate(phoneTimeValue(phone)) - toDate(record.timestamp)) / 1000;
             return delta <= MAX_VISUAL_TIME_DELTA_S && (!best || delta < best.delta) ? { phone, delta } : best;
           }, null)?.phone;
           return markerSource ? { ...projectPoint(markerSource, origin), record } : null;
@@ -1553,12 +1567,12 @@
           alerts: item.alerts.join(";")
         });
       }
-      for (const item of sortByTime(session.phoneRecords, "timestamp")) {
+      for (const item of sortPhonesByCollectionTime(session.phoneRecords)) {
         rows.push({
           source: "PHONE",
           session: session.name,
           caseName: session.caseName,
-          time: item.timestamp,
+          time: phoneTimeValue(item),
           loop: item.linkedMqttLoop,
           latitude: item.latitude,
           longitude: item.longitude,
@@ -1631,9 +1645,10 @@
 
       addRows(
         "手机定位数据",
-        ["time", "latitude", "longitude", "accuracy", "linkedMqttLoop", "timeDeltaS", "distanceM", "level", "alerts"],
-        sortByTime(session.phoneRecords, "timestamp").map((item) => ({
-          time: item.timestamp,
+        ["time", "geolocationTimestamp", "latitude", "longitude", "accuracy", "linkedMqttLoop", "timeDeltaS", "distanceM", "level", "alerts"],
+        sortPhonesByCollectionTime(session.phoneRecords).map((item) => ({
+          time: phoneTimeValue(item),
+          geolocationTimestamp: item.geolocationTimestamp || "",
           latitude: item.latitude,
           longitude: item.longitude,
           accuracy: item.accuracy,
