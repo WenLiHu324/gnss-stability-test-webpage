@@ -1673,11 +1673,7 @@
 
       const alignedCount = alignment.rows.filter((row) => row.mqtt).length;
       const missingCount = alignment.rows.length - alignedCount;
-      const distances = pairedRows.map((row) => row.distanceM).filter((value) => Number.isFinite(Number(value)));
-      const avgDistance = distances.length ? Math.round(distances.reduce((sum, value) => sum + Number(value), 0) / distances.length * 10) / 10 : null;
-      const maxDistance = distances.length ? Math.round(Math.max(...distances.map(Number)) * 10) / 10 : null;
-      const errorText = avgDistance == null ? "误差暂无" : `平均误差 ${avgDistance}m，最大误差 ${maxDistance}m`;
-      els.trajectorySummary.textContent = `手机点 ${phonePoints.length} 个；${MAX_VISUAL_TIME_DELTA_S}s内对齐 ${alignedCount}/${alignment.rows.length} 条，超时不入图 ${missingCount} 条；MQTT有效点 ${validMqttRecords.length} 个，MQTT NaN点 ${invalidPoints.length} 个；${errorText}。`;
+      els.trajectorySummary.textContent = `手机点 ${phonePoints.length} 个；${MAX_VISUAL_TIME_DELTA_S}s内对齐 ${alignedCount}/${alignment.rows.length} 条，超时不入图 ${missingCount} 条；MQTT有效点 ${validMqttRecords.length} 个，MQTT NaN点 ${invalidPoints.length} 个。`;
       trajectoryView.hasDrawing = true;
     }
 
