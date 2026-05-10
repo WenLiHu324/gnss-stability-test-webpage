@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: gnss-stability-backup
+    env: node
+    rootDir: backend
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: GNSS_DATA_DIR
+        value: /data
+    disk:
+      name: gnss-stability-data
+      mountPath: /data
+      sizeGB: 1
