@@ -42,6 +42,24 @@ The current webpage UI supports a plain endpoint URL only. If you want token-pro
 
 The GitHub Pages webpage is HTTPS. For phones to upload successfully, the backup server must also be reachable through HTTPS.
 
+## Render Blueprint deployment
+
+This repository includes a root-level `render.yaml`.
+
+1. Open Render and choose **New -> Blueprint**.
+2. Connect the GitHub repository `WenLiHu324/gnss-stability-test-webpage`.
+3. Render will detect `render.yaml` and create `gnss-stability-backup`.
+4. After deployment, copy the service URL and append `/api/ingest`.
+5. Paste that URL into the webpage's remote backup address field.
+
+Example:
+
+```text
+https://gnss-stability-backup.onrender.com/api/ingest
+```
+
+The blueprint uses a persistent disk mounted at `/data`, so JSONL backup files survive service restarts and redeploys.
+
 Suitable options:
 
 - Deploy this `backend` folder to Render, Railway, Fly.io, or a VPS with HTTPS.
