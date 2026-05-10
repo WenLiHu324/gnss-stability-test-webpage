@@ -766,6 +766,10 @@
       return phone?.receivedAt || phone?.timestamp || "";
     }
 
+    function mqttTimeValue(record) {
+      return record?.receivedAt || record?.timestamp || "";
+    }
+
     function sortPhonesByCollectionTime(items) {
       return [...items].sort((a, b) => toDate(phoneTimeValue(a)) - toDate(phoneTimeValue(b)));
     }
@@ -811,14 +815,14 @@
 
     function buildAlignedRecords(session) {
       const phones = sortPhonesByCollectionTime(session?.phoneRecords || []);
-      const mqttRecords = sortByTime(session?.mqttRecords || [], "timestamp");
+      const mqttRecords = sortByTime(session?.mqttRecords || [], "receivedAt");
       const byMqttId = new Map();
       const rows = phones.map((phone) => {
         const phoneTime = toDate(phoneTimeValue(phone)).getTime();
         let nearest = null;
         let nearestDelta = Infinity;
         for (const mqttRecord of mqttRecords) {
-          const delta = Math.abs(phoneTime - toDate(mqttRecord.timestamp).getTime()) / 1000;
+          const delta = Math.abs(phoneTime - toDate(mqttTimeValue(mqttRecord)).getTime()) / 1000;
           if (delta < nearestDelta) {
             nearest = mqttRecord;
             nearestDelta = delta;
@@ -831,7 +835,7 @@
         const row = {
           phone,
           mqtt: linkedMqtt,
-          timeDeltaS: linkedMqtt ? Math.round((toDate(phoneTimeValue(phone)) - toDate(linkedMqtt.timestamp)) / 1000) : null,
+          timeDeltaS: linkedMqtt ? Math.round((toDate(phoneTimeValue(phone)) - toDate(mqttTimeValue(linkedMqtt))) / 1000) : null,
           distanceM: Number.isFinite(distance) ? Math.round(distance * 10) / 10 : null
         };
         if (linkedMqtt) {
@@ -847,7 +851,7 @@
 
     function eventStateForMqtt(session, mqttRecord) {
       const marks = sortByTime(session?.marks || [], "timestamp")
-        .filter((item) => toDate(item.timestamp) <= toDate(mqttRecord.timestamp));
+        .filter((item) => toDate(item.timestamp) <= toDate(mqttTimeValue(mqttRecord)));
       const scene = marks.filter((item) => item.type === "场景标注").at(-1)?.label || "";
       const action = marks.filter((item) => item.type === "动作标注").at(-1)?.label || "";
       if (scene && action) return `${scene} ${action}`;
@@ -957,10 +961,10 @@
 
       if (linkedMqtt) {
         distance = haversineMeters(linkedMqtt.latitude, linkedMqtt.longitude, phone.latitude, phone.longitude);
-        timeDelta = Math.round((toDate(phoneTimeValue(phone)) - toDate(linkedMqtt.timestamp)) / 1000);
+        timeDelta = Math.round((toDate(phoneTimeValue(phone)) - toDate(mqttTimeValue(linkedMqtt))) / 1000);
         if (Number.isFinite(distance) && distance > 50) alerts.push("手机对标误差超过50m");
         else if (Number.isFinite(distance) && distance > 20) alerts.push("手机对标误差超过20m");
-        if (Math.abs(timeDelta) > 5) alerts.push("时间差超过5s");
+        if (Math.abs(timeDelta) > MAX_VISUAL_TIME_DELTA_S) alerts.push(`采集时间差超过${MAX_VISUAL_TIME_DELTA_S}s`);
       }
 
       if (Number.isFinite(Number(phone.accuracy)) && Number(phone.accuracy) > 30) {
@@ -1230,6 +1234,7 @@
       const rows = sortByTime(session.mqttRecords, "timestamp").map((item) => `
         <tr class="${item.level}">
           <td>${formatDate(item.timestamp)}</td>
+          <td>${formatDate(item.receivedAt)}</td>
           <td>${item.loop ?? ""}</td>
           <td>${fixed(item.latitude)}</td>
           <td>${fixed(item.longitude)}</td>
@@ -1246,7 +1251,7 @@
       `).join("");
       els.mqttRecords.innerHTML = `
         <table>
-          <thead><tr><th>GPS时间</th><th>Loop</th><th>纬度</th><th>经度</th><th>可见星</th><th>有效星</th><th>HDOP</th><th>在线</th><th>Fix</th><th>Status</th><th>Event</th><th>判定</th><th>自动识别</th></tr></thead>
+          <thead><tr><th>GPS时间</th><th>MQTT接收时间</th><th>Loop</th><th>纬度</th><th>经度</th><th>可见星</th><th>有效星</th><th>HDOP</th><th>在线</th><th>Fix</th><th>Status</th><th>Event</th><th>判定</th><th>自动识别</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       `;
@@ -1461,7 +1466,7 @@
         .map((record) => {
           const aligned = phoneByMqttId.get(record.id);
           const markerSource = aligned?.phone || phoneRecords.reduce((best, phone) => {
-            const delta = Math.abs(toDate(phoneTimeValue(phone)) - toDate(record.timestamp)) / 1000;
+            const delta = Math.abs(toDate(phoneTimeValue(phone)) - toDate(mqttTimeValue(record))) / 1000;
             return delta <= MAX_VISUAL_TIME_DELTA_S && (!best || delta < best.delta) ? { phone, delta } : best;
           }, null)?.phone;
           return markerSource ? { ...projectPoint(markerSource, origin), record } : null;
@@ -1581,6 +1586,7 @@
           session: session.name,
           caseName: session.caseName,
           time: item.timestamp,
+          mqttReceivedAt: item.receivedAt,
           loop: item.loop,
           latitude: item.latitude,
           longitude: item.longitude,
@@ -1654,9 +1660,10 @@
 
       addRows(
         "MQTT数据",
-        ["time", "loop", "latitude", "longitude", "visibleSatellites", "usedSatellites", "hdop", "onlineStatus", "fix", "status", "event", "level", "alerts"],
+        ["time", "mqttReceivedAt", "loop", "latitude", "longitude", "visibleSatellites", "usedSatellites", "hdop", "onlineStatus", "fix", "status", "event", "level", "alerts"],
         sortByTime(session.mqttRecords, "timestamp").map((item) => ({
           time: item.timestamp,
+          mqttReceivedAt: item.receivedAt,
           loop: item.loop,
           latitude: item.latitude,
           longitude: item.longitude,
