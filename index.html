@@ -142,6 +142,20 @@
       margin-top: 12px;
     }
 
+    .backup-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 10px;
+      align-items: end;
+      margin-top: 12px;
+    }
+
+    .backup-status {
+      color: #5d687a;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
     .metric {
       min-width: 0;
       padding: 12px;
@@ -457,6 +471,7 @@
 
       .grid,
       .form-grid,
+      .backup-grid,
       .event-groups {
         grid-template-columns: 1fr;
       }
@@ -502,6 +517,14 @@
         <button class="ghost" id="exportJsonButton" type="button">导出所选轮 JSON</button>
         <button class="danger" id="deleteButton" type="button">删除所选轮</button>
       </div>
+      <div class="backup-grid" aria-label="远程备份">
+        <label>远程备份地址
+          <input id="backupUrlInput" placeholder="例如 https://your-domain.example/api/ingest">
+        </label>
+        <button class="ghost" id="saveBackupButton" type="button">保存备份地址</button>
+        <button class="ghost" id="testBackupButton" type="button">测试备份</button>
+      </div>
+      <div class="backup-status" id="backupStatus">远程备份默认关闭；不填写地址时不会上传任何数据。</div>
       <div class="note" id="message">等待 MQTT 数据。第一条包含 longitude 字段的数据会自动开始测试。</div>
     </section>
 
@@ -621,6 +644,7 @@
     const MQTT_BROKER_URL = "wss://broker.emqx.io:8084/mqtt";
     const MQTT_TOPIC = "device/gnss/#";
     const STORAGE_KEY = "gnss-stability-test-v3";
+    const BACKUP_URL_KEY = "gnss-stability-backup-url-v1";
     const PHONE_OPTIONS = {
       enableHighAccuracy: true,
       timeout: 10000,
@@ -659,6 +683,10 @@
       exportCsvButton: document.querySelector("#exportCsvButton"),
       exportJsonButton: document.querySelector("#exportJsonButton"),
       deleteButton: document.querySelector("#deleteButton"),
+      backupUrlInput: document.querySelector("#backupUrlInput"),
+      saveBackupButton: document.querySelector("#saveBackupButton"),
+      testBackupButton: document.querySelector("#testBackupButton"),
+      backupStatus: document.querySelector("#backupStatus"),
       message: document.querySelector("#message"),
       mqttStatus: document.querySelector("#mqttStatus"),
       activeSession: document.querySelector("#activeSession"),
@@ -694,6 +722,7 @@
     let lastMqtt = null;
     let lastPhone = null;
     let pendingMqttRecordId = null;
+    let backupUrl = localStorage.getItem(BACKUP_URL_KEY) || "";
     const trajectoryView = {
       scale: 1,
       offsetX: 0,
@@ -723,6 +752,74 @@
     function saveState() {
       state.activeSessionId = activeSessionId;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function setBackupStatus(text, isError = false) {
+      els.backupStatus.textContent = text;
+      els.backupStatus.style.color = isError ? "#803030" : "#5d687a";
+    }
+
+    function saveBackupUrl() {
+      backupUrl = els.backupUrlInput.value.trim();
+      if (backupUrl) {
+        localStorage.setItem(BACKUP_URL_KEY, backupUrl);
+        setBackupStatus(`远程备份已开启：${backupUrl}`);
+      } else {
+        localStorage.removeItem(BACKUP_URL_KEY);
+        setBackupStatus("远程备份已关闭；当前数据仍只保存在本机浏览器。");
+      }
+    }
+
+    function backupPayload(kind, session, payload) {
+      if (!backupUrl || !session) return;
+      const body = {
+        kind,
+        savedAt: new Date().toISOString(),
+        session: {
+          id: session.id,
+          name: session.name,
+          caseName: session.caseName,
+          tester: session.tester,
+          device: session.device,
+          startedAt: session.startedAt,
+          endedAt: session.endedAt
+        },
+        payload
+      };
+      fetch(backupUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        keepalive: true
+      })
+        .then((response) => {
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          setBackupStatus(`远程备份成功：${kind} ${formatDate(body.savedAt)}`);
+        })
+        .catch((error) => {
+          setBackupStatus(`远程备份失败：${error.message}`, true);
+        });
+    }
+
+    function testBackup() {
+      saveBackupUrl();
+      if (!backupUrl) {
+        setBackupStatus("请先填写远程备份地址。", true);
+        return;
+      }
+      const pseudoSession = selectedSession() || activeSession() || {
+        id: "test",
+        name: "测试连接",
+        caseName: "",
+        tester: "",
+        device: "",
+        startedAt: "",
+        endedAt: ""
+      };
+      backupPayload("healthcheck", pseudoSession, {
+        message: "GNSS stability webpage backup test",
+        userAgent: navigator.userAgent
+      });
     }
 
     function activeSession() {
@@ -1045,6 +1142,7 @@
       lastMqtt = record;
       pendingMqttRecordId = record.id;
       saveState();
+      backupPayload("mqtt", session, record);
       updateRealtime();
       render();
       requestPhoneLocation("mqtt");
@@ -1088,6 +1186,7 @@
           if (session) {
             session.phoneRecords.push(phone);
             saveState();
+            backupPayload("phone", session, phone);
           }
           updateRealtime();
           render();
@@ -1151,6 +1250,7 @@
       activeSessionId = null;
       pendingMqttRecordId = null;
       saveState();
+      backupPayload("session-ended", session, { endedAt: session.endedAt });
       setMessage(`${session.name} 已结束。下一条 MQTT 数据会自动开始新一轮。`);
       render();
     }
@@ -1161,7 +1261,7 @@
         setMessage("尚未开始测试，收到 MQTT 数据自动开始后再标注。", true);
         return;
       }
-      session.marks.push({
+      const mark = {
         id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
         type: groupName,
         label,
@@ -1169,8 +1269,10 @@
         nearestMqttId: lastMqtt ? lastMqtt.id : "",
         nearestMqttLoop: lastMqtt ? lastMqtt.loop : "",
         nearestPhoneId: lastPhone ? lastPhone.id : ""
-      });
+      };
+      session.marks.push(mark);
       saveState();
+      backupPayload("mark", session, mark);
       setMessage(`已加入${groupName}：${label}`);
       render();
     }
@@ -1955,6 +2057,8 @@
     }
 
     function initOptions() {
+      els.backupUrlInput.value = backupUrl;
+      setBackupStatus(backupUrl ? `远程备份已开启：${backupUrl}` : "远程备份默认关闭；不填写地址时不会上传任何数据。");
       for (const item of testCases) {
         const option = document.createElement("option");
         option.value = item;
@@ -1987,6 +2091,8 @@
     els.exportCsvButton.addEventListener("click", exportCsv);
     els.exportJsonButton.addEventListener("click", exportJson);
     els.deleteButton.addEventListener("click", deleteSelectedSession);
+    els.saveBackupButton.addEventListener("click", saveBackupUrl);
+    els.testBackupButton.addEventListener("click", testBackup);
     els.zoomInButton.addEventListener("click", () => zoomTrajectory(1.25));
     els.zoomOutButton.addEventListener("click", () => zoomTrajectory(0.8));
     els.resetViewButton.addEventListener("click", () => renderTrajectory(selectedSession(), { reset: true, preserveView: false }));
