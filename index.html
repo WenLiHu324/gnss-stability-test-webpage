@@ -610,6 +610,7 @@
           <span class="viz-key"><span class="viz-swatch latest-phone"></span>最新手机段</span>
           <span class="viz-key"><span class="viz-swatch latest-mqtt"></span>最新MQTT段</span>
           <span class="viz-key"><span class="viz-swatch invalid"></span>MQTT NaN 点</span>
+          <span class="viz-key"><span class="viz-swatch" style="background: rgba(130, 90, 30, 0.62);"></span>红蓝误差连线</span>
         </div>
       </div>
     </section>
@@ -788,6 +789,23 @@
       const s2 = Math.sin(dLon / 2);
       const a = s1 * s1 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * s2 * s2;
       return 2 * r * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function coordinateDeltaMeters(phone, mqttRecord) {
+      if (!isCoordinateFinite(phone) || !isCoordinateFinite(mqttRecord)) {
+        return null;
+      }
+      const lat = (Number(phone.latitude) + Number(mqttRecord.latitude)) / 2;
+      const metersPerDegLat = 111320;
+      const metersPerDegLon = 111320 * Math.cos(lat * Math.PI / 180);
+      const eastM = (Number(mqttRecord.longitude) - Number(phone.longitude)) * metersPerDegLon;
+      const northM = (Number(mqttRecord.latitude) - Number(phone.latitude)) * metersPerDegLat;
+      const distanceM = haversineMeters(phone.latitude, phone.longitude, mqttRecord.latitude, mqttRecord.longitude);
+      return {
+        eastM: Math.round(eastM * 10) / 10,
+        northM: Math.round(northM * 10) / 10,
+        distanceM: Number.isFinite(distanceM) ? Math.round(distanceM * 10) / 10 : null
+      };
     }
 
     function isCoordinateFinite(record) {
@@ -1335,6 +1353,105 @@
       ctx.stroke();
     }
 
+    function niceMapStep(rawMeters) {
+      const value = Math.max(1, rawMeters);
+      const power = 10 ** Math.floor(Math.log10(value));
+      const normalized = value / power;
+      if (normalized <= 1) return power;
+      if (normalized <= 2) return 2 * power;
+      if (normalized <= 5) return 5 * power;
+      return 10 * power;
+    }
+
+    function drawMapBackground(ctx, width, height, worldToScreen, screenToWorld, metersPerPixel) {
+      ctx.fillStyle = "#f7fbf7";
+      ctx.fillRect(0, 0, width, height);
+
+      const topLeft = screenToWorld(0, 0);
+      const bottomRight = screenToWorld(width, height);
+      const minX = Math.min(topLeft.x, bottomRight.x);
+      const maxX = Math.max(topLeft.x, bottomRight.x);
+      const minY = Math.min(topLeft.y, bottomRight.y);
+      const maxY = Math.max(topLeft.y, bottomRight.y);
+      const step = niceMapStep(metersPerPixel * 86);
+
+      ctx.strokeStyle = "#dfe9dd";
+      ctx.lineWidth = 1;
+      ctx.font = "11px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
+      ctx.fillStyle = "#7a897c";
+      for (let x = Math.floor(minX / step) * step; x <= maxX; x += step) {
+        const screen = worldToScreen({ x, y: 0 });
+        ctx.beginPath();
+        ctx.moveTo(screen.x, 0);
+        ctx.lineTo(screen.x, height);
+        ctx.stroke();
+      }
+      for (let y = Math.floor(minY / step) * step; y <= maxY; y += step) {
+        const screen = worldToScreen({ x: 0, y });
+        ctx.beginPath();
+        ctx.moveTo(0, screen.y);
+        ctx.lineTo(width, screen.y);
+        ctx.stroke();
+      }
+
+      const scaleMeters = niceMapStep(metersPerPixel * 120);
+      const scalePx = scaleMeters / metersPerPixel;
+      const sx = 18;
+      const sy = height - 28;
+      ctx.strokeStyle = "#172033";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(sx + scalePx, sy);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy - 5);
+      ctx.lineTo(sx, sy + 5);
+      ctx.moveTo(sx + scalePx, sy - 5);
+      ctx.lineTo(sx + scalePx, sy + 5);
+      ctx.stroke();
+      ctx.fillStyle = "#172033";
+      ctx.fillText(`${scaleMeters} m`, sx, sy - 8);
+
+      ctx.save();
+      ctx.translate(width - 34, 34);
+      ctx.strokeStyle = "#172033";
+      ctx.fillStyle = "#172033";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, 18);
+      ctx.lineTo(0, -12);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, -16);
+      ctx.lineTo(-6, -5);
+      ctx.lineTo(6, -5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.font = "12px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
+      ctx.fillText("N", -4, 30);
+      ctx.restore();
+    }
+
+    function drawErrorConnectors(ctx, pairedPoints, toScreen) {
+      if (!pairedPoints.length) return;
+      ctx.save();
+      ctx.setLineDash?.([5, 5]);
+      ctx.strokeStyle = "rgba(130, 90, 30, 0.62)";
+      ctx.lineWidth = 1.4;
+      for (const pair of pairedPoints) {
+        const phone = toScreen(pair.phone);
+        const mqtt = toScreen(pair.mqtt);
+        ctx.beginPath();
+        ctx.moveTo(phone.x, phone.y);
+        ctx.lineTo(mqtt.x, mqtt.y);
+        ctx.stroke();
+      }
+      ctx.setLineDash?.([]);
+      ctx.restore();
+    }
+
     function drawDirectionArrows(ctx, points, color, toScreen) {
       if (points.length < 2) return;
       const step = Math.max(1, Math.floor(points.length / 8));
@@ -1511,24 +1628,18 @@
           y: height / 2 - (point.y - trajectoryView.centerY) * scale + trajectoryView.offsetY
         };
       };
+      const screenToWorld = (x, y) => {
+        const scale = trajectoryView.baseScale * trajectoryView.scale;
+        return {
+          x: (x - width / 2 - trajectoryView.offsetX) / scale + trajectoryView.centerX,
+          y: trajectoryView.centerY - (y - height / 2 - trajectoryView.offsetY) / scale
+        };
+      };
+      const metersPerPixel = 1 / (trajectoryView.baseScale * trajectoryView.scale);
 
-      ctx.fillStyle = "#fbfcff";
-      ctx.fillRect(0, 0, width, height);
-      ctx.strokeStyle = "#e7edf5";
-      ctx.lineWidth = 1;
-      for (let x = 0; x <= width; x += 48) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, height);
-        ctx.stroke();
-      }
-      for (let y = 0; y <= height; y += 48) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(width, y);
-        ctx.stroke();
-      }
+      drawMapBackground(ctx, width, height, toScreen, screenToWorld, metersPerPixel);
 
+      drawErrorConnectors(ctx, pairedPoints, toScreen);
       drawPath(ctx, phonePoints, "#d93025", toScreen);
       drawPath(ctx, mqttPoints, "#1f6fb2", toScreen);
       drawDirectionArrows(ctx, phonePoints, "#d93025", toScreen);
@@ -1562,7 +1673,11 @@
 
       const alignedCount = alignment.rows.filter((row) => row.mqtt).length;
       const missingCount = alignment.rows.length - alignedCount;
-      els.trajectorySummary.textContent = `手机点 ${phonePoints.length} 个；${MAX_VISUAL_TIME_DELTA_S}s内对齐 ${alignedCount}/${alignment.rows.length} 条，超时不入图 ${missingCount} 条；MQTT有效点 ${validMqttRecords.length} 个，MQTT NaN点 ${invalidPoints.length} 个。`;
+      const distances = pairedRows.map((row) => row.distanceM).filter((value) => Number.isFinite(Number(value)));
+      const avgDistance = distances.length ? Math.round(distances.reduce((sum, value) => sum + Number(value), 0) / distances.length * 10) / 10 : null;
+      const maxDistance = distances.length ? Math.round(Math.max(...distances.map(Number)) * 10) / 10 : null;
+      const errorText = avgDistance == null ? "误差暂无" : `平均误差 ${avgDistance}m，最大误差 ${maxDistance}m`;
+      els.trajectorySummary.textContent = `手机点 ${phonePoints.length} 个；${MAX_VISUAL_TIME_DELTA_S}s内对齐 ${alignedCount}/${alignment.rows.length} 条，超时不入图 ${missingCount} 条；MQTT有效点 ${validMqttRecords.length} 个，MQTT NaN点 ${invalidPoints.length} 个；${errorText}。`;
       trajectoryView.hasDrawing = true;
     }
 
@@ -1769,12 +1884,17 @@
       const precision = hdopPrecisionPercent(point.record.hdop);
       const distance = point.aligned?.distanceM;
       const timeDelta = point.aligned?.timeDeltaS;
-      const phoneTime = point.aligned?.phone ? phoneTimeValue(point.aligned.phone) : "";
+      const phone = point.aligned?.phone || null;
+      const phoneTime = phone ? phoneTimeValue(phone) : "";
+      const delta = phone ? coordinateDeltaMeters(phone, point.record) : null;
       els.trajectoryPopup.innerHTML = `
         <strong>MQTT Loop ${point.record.loop || "--"}</strong>
         <div>HDOP 精度指标：${precision == null ? "NaN" : `${precision}%`}</div>
         <div>Haversine 误差：${distance == null ? "NaN" : `${distance} m`}</div>
+        <div>东西/南北误差：${delta ? `${delta.eastM} m / ${delta.northM} m` : "NaN"}</div>
         <div>时间差：${timeDelta == null ? "NaN" : `${timeDelta}s`}</div>
+        <div>手机经纬度：${phone ? `${fixed(phone.latitude, 7)}, ${fixed(phone.longitude, 7)}` : "NaN"}</div>
+        <div>GNSS经纬度：${fixed(point.record.latitude, 7)}, ${fixed(point.record.longitude, 7)}</div>
         <div>事件状态：${point.eventState}</div>
         <div>有效卫星数：${point.record.usedSatellites || "NaN"}</div>
         <div>GNSS采集时间：${formatDate(point.record.timestamp)}</div>
