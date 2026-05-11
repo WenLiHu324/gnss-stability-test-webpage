@@ -8,7 +8,7 @@
 页面会在浏览器里直接连接 MQTT WebSocket：
 
 - Broker: `wss://broker.emqx.io:8084/mqtt`
-- Topic: `device/gnss/#`
+- Topic: `DEVICE_REPORT/ec800m-necklace`
 
 ## 推荐方案：HTTPS 静态托管
 
@@ -62,7 +62,7 @@
 
 ```js
 const MQTT_BROKER_URL = "wss://broker.emqx.io:8084/mqtt";
-const MQTT_TOPIC = "device/gnss/#";
+const MQTT_TOPIC = "DEVICE_REPORT/ec800m-necklace";
 ```
 
 ## 本机临时预览
