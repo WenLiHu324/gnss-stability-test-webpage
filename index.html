@@ -1046,8 +1046,14 @@
       };
     }
 
-    function hasLongitudeField(payload) {
-      return Object.prototype.hasOwnProperty.call(payload, "longitude");
+    function hasField(object, key) {
+      return object && Object.prototype.hasOwnProperty.call(object, key);
+    }
+
+    function numericOrNull(value) {
+      if (value == null || value === "") return null;
+      const number = Number(value);
+      return Number.isFinite(number) ? number : null;
     }
 
     function normalizeMqttPayload(topic, text) {
@@ -1063,10 +1069,19 @@
       }
 
       const payload = JSON.parse(jsonText);
-      const latitude = payload.latitude == null ? null : Number(payload.latitude);
-      const longitude = payload.longitude == null ? null : Number(payload.longitude);
+      const gnss = payload.gnss && typeof payload.gnss === "object" ? payload.gnss : null;
+      const source = gnss || payload;
+      const latitude = numericOrNull(source.latitude);
+      const longitude = numericOrNull(source.longitude);
+      const hasLongitude = hasField(source, "longitude");
+      const timestamp = gnss?.utc_time
+        || payload.utc_time
+        || (typeof payload.timestamp === "string" ? payload.timestamp : "")
+        || new Date().toISOString();
+      const satellites = source.satellites_num ?? payload.visible_satellites ?? "";
+      const valid = gnss ? gnss.valid === true : null;
 
-      if (!hasLongitudeField(payload)) {
+      if (!hasLongitude) {
         throw new Error("MQTT JSON 不包含 longitude 字段。");
       }
 
@@ -1074,20 +1089,23 @@
         id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
         topic,
         receivedAt: new Date().toISOString(),
-        timestamp: payload.timestamp || new Date().toISOString(),
-        latitude: Number.isFinite(latitude) ? latitude : null,
-        longitude: Number.isFinite(longitude) ? longitude : null,
-        loop: payload.loop ?? "",
-        speed: payload.speed ?? "",
+        timestamp,
+        latitude,
+        longitude,
+        loop: payload.seq ?? payload.loop ?? "",
+        speed: source.speed_kph ?? payload.speed ?? "",
         trackedSatelliteRecords: payload.tracked_satellite_records ?? "",
-        onlineStatus: payload.online_status ?? "",
-        status: payload.status ?? "",
-        hdop: payload.hdop ?? "",
-        fix: payload.fix ?? "",
-        visibleSatellites: payload.visible_satellites ?? "",
-        usedSatellites: payload.used_satellites ?? "",
+        onlineStatus: payload.online_status ?? (payload.type === "device_report" ? 1 : ""),
+        status: source.status ?? payload.status ?? "",
+        hdop: source.hdop ?? payload.hdop ?? "",
+        fix: gnss ? (valid ? 1 : 0) : (payload.fix ?? ""),
+        visibleSatellites: satellites,
+        usedSatellites: payload.used_satellites ?? satellites,
         gpsErrorM: payload.gps_error_m ?? "",
-        event: payload.event ?? "",
+        event: payload.report_type ?? payload.event ?? "",
+        gnssValid: valid,
+        gnssQuality: source.quality ?? "",
+        gnssFixMode: source.fix_mode ?? "",
         raw: text,
         payload
       };
@@ -1103,8 +1121,12 @@
       const latOk = Number.isFinite(Number(record.latitude));
       const lonOk = Number.isFinite(Number(record.longitude));
 
-      if (online !== 1) alerts.push("设备离线");
-      if (fix !== 1 || record.status === "V" || record.event === "WAIT") alerts.push("无有效Fix");
+      const onlineKnown = record.onlineStatus !== "" && record.onlineStatus != null;
+      const fixKnown = record.fix !== "" && record.fix != null;
+      const status = String(record.status || "").toLowerCase();
+
+      if (onlineKnown && online !== 1) alerts.push("设备离线");
+      if ((fixKnown && fix !== 1) || record.gnssValid === false || ["v", "wait", "not_fixed", "no_fix"].includes(status) || record.event === "WAIT") alerts.push("无有效Fix");
       if (!latOk || !lonOk) alerts.push("经纬度为空");
       if (Number.isFinite(visible) && visible === 0) alerts.push("无可见卫星");
       if (Number.isFinite(used) && used < 4) alerts.push("有效卫星不足4");
@@ -1287,7 +1309,7 @@
             return;
           }
           els.mqttStatus.textContent = "等待日志";
-          els.rawMqtt.textContent = `已订阅 ${MQTT_TOPIC}，等待 MQTTX/设备上传日志。`;
+          els.rawMqtt.textContent = `已订阅 ${MQTT_TOPIC}，支持 device_report v1.0，等待 MQTTX/设备上传日志。`;
         });
       });
       mqttClient.on("message", handleMqttMessage);
