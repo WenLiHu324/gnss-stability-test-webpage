@@ -490,7 +490,7 @@
   <main>
     <header>
       <h1>GNSS 稳定性测试记录页</h1>
-      <p>页面订阅 MQTTX 同源日志。收到包含 <strong>longitude</strong> 字段的 MQTT 数据后自动开始新一轮测试，并同步触发手机定位；结束测试由人工点击。</p>
+      <p>页面订阅 MQTTX 同源日志。收到包含 <strong>gnss</strong> 对象的 MQTT 数据后自动开始新一轮测试，并同步触发手机定位；结束测试由人工点击。</p>
     </header>
 
     <section class="panel" aria-label="测试控制">
@@ -538,7 +538,7 @@
         <button class="ghost" id="testBackupButton" type="button">测试备份</button>
       </div>
       <div class="backup-status" id="backupStatus">远程备份默认关闭；不填写地址时不会上传任何数据。</div>
-      <div class="note" id="message">等待 MQTT 数据。第一条包含 longitude 字段的数据会自动开始测试。</div>
+      <div class="note" id="message">等待 MQTT 数据。第一条包含 gnss 对象的数据会自动开始测试。</div>
     </section>
 
     <section class="panel" aria-label="实时状态">
@@ -915,6 +915,10 @@
       return Number.isFinite(number) ? number.toFixed(digits) : "--";
     }
 
+    function displayValue(value) {
+      return value === "" || value == null ? "--" : String(value);
+    }
+
     function toDate(value) {
       const date = value ? new Date(value) : new Date();
       return Number.isNaN(date.getTime()) ? new Date() : date;
@@ -925,7 +929,11 @@
     }
 
     function mqttTimeValue(record) {
-      return record?.timestamp || record?.receivedAt || "";
+      return record?.receivedAt || record?.timestamp || "";
+    }
+
+    function sortMqttByCollectionTime(items) {
+      return [...items].sort((a, b) => toDate(mqttTimeValue(a)) - toDate(mqttTimeValue(b)));
     }
 
     function sortPhonesByCollectionTime(items) {
@@ -990,7 +998,7 @@
 
     function buildAlignedRecords(session) {
       const phones = sortPhonesByCollectionTime(session?.phoneRecords || []);
-      const mqttRecords = sortByTime(session?.mqttRecords || [], "timestamp");
+      const mqttRecords = sortMqttByCollectionTime(session?.mqttRecords || []);
       const byMqttId = new Map();
       const rows = phones.map((phone) => {
         const phoneTime = toDate(phoneTimeValue(phone)).getTime();
@@ -1069,27 +1077,26 @@
       }
 
       const payload = JSON.parse(jsonText);
+      const receivedAt = new Date().toISOString();
       const gnss = payload.gnss && typeof payload.gnss === "object" ? payload.gnss : null;
       const source = gnss || payload;
       const latitude = numericOrNull(source.latitude);
       const longitude = numericOrNull(source.longitude);
-      const hasLongitude = hasField(source, "longitude");
-      const timestamp = gnss?.utc_time
-        || payload.utc_time
-        || (typeof payload.timestamp === "string" ? payload.timestamp : "")
-        || new Date().toISOString();
+      const isLegacyGnss = !gnss && (hasField(payload, "longitude") || hasField(payload, "latitude"));
+      const hasGnssData = Boolean(gnss) || isLegacyGnss;
       const satellites = source.satellites_num ?? payload.visible_satellites ?? "";
       const valid = gnss ? gnss.valid === true : null;
 
-      if (!hasLongitude) {
-        throw new Error("MQTT JSON 不包含 longitude 字段。");
+      if (!hasGnssData) {
+        return null;
       }
 
       return {
         id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
         topic,
-        receivedAt: new Date().toISOString(),
-        timestamp,
+        receivedAt,
+        timestamp: receivedAt,
+        gnssUtcTime: gnss?.utc_time || payload.utc_time || "",
         latitude,
         longitude,
         loop: payload.seq ?? payload.loop ?? "",
@@ -1106,6 +1113,7 @@
         gnssValid: valid,
         gnssQuality: source.quality ?? "",
         gnssFixMode: source.fix_mode ?? "",
+        hasGnssData,
         raw: text,
         payload
       };
@@ -1212,6 +1220,12 @@
         els.rawMqtt.textContent = `Topic: ${topic}\n${text}`;
         els.mqttStatus.textContent = "解析失败";
         setMessage(error.message, true);
+        return;
+      }
+      if (!record) {
+        els.rawMqtt.textContent = `Topic: ${topic}\n${text}`;
+        els.mqttStatus.textContent = "等待GNSS";
+        setMessage("收到非 GNSS MQTT 消息，未更新测试数据。");
         return;
       }
 
@@ -1384,8 +1398,8 @@
       if (lastMqtt) {
         els.mqttLatitude.textContent = fixed(lastMqtt.latitude);
         els.mqttLongitude.textContent = fixed(lastMqtt.longitude);
-        els.satelliteValue.textContent = `${lastMqtt.visibleSatellites || "--"}/${lastMqtt.usedSatellites || "--"}`;
-        els.onlineValue.textContent = `${lastMqtt.onlineStatus ?? "--"}/${lastMqtt.fix ?? "--"}`;
+        els.satelliteValue.textContent = `${displayValue(lastMqtt.visibleSatellites)}/${displayValue(lastMqtt.usedSatellites)}`;
+        els.onlineValue.textContent = `${displayValue(lastMqtt.onlineStatus)}/${displayValue(lastMqtt.fix)}`;
         els.latestLevel.textContent = `${levelName(lastMqtt.level)} ${lastMqtt.alerts.length ? lastMqtt.alerts.join("、") : ""}`;
         els.rawMqtt.textContent = `Topic: ${lastMqtt.topic}\n${JSON.stringify(lastMqtt.payload, null, 2)}`;
       }
@@ -1433,9 +1447,9 @@
         els.mqttRecords.innerHTML = '<div class="empty">暂无 MQTT 数据。</div>';
         return;
       }
-      const rows = sortByTime(session.mqttRecords, "timestamp").map((item) => `
+      const rows = sortMqttByCollectionTime(session.mqttRecords).map((item) => `
         <tr class="${item.level}">
-          <td>${formatDate(item.timestamp)}</td>
+          <td>${formatDate(mqttTimeValue(item))}</td>
           <td>${formatDate(item.receivedAt)}</td>
           <td>${item.loop ?? ""}</td>
           <td>${fixed(item.latitude)}</td>
@@ -1453,7 +1467,7 @@
       `).join("");
       els.mqttRecords.innerHTML = `
         <table>
-          <thead><tr><th>GPS时间</th><th>MQTT接收时间</th><th>Loop</th><th>纬度</th><th>经度</th><th>可见星</th><th>有效星</th><th>HDOP</th><th>在线</th><th>Fix</th><th>Status</th><th>Event</th><th>判定</th><th>自动识别</th></tr></thead>
+          <thead><tr><th>采集时间</th><th>MQTT接收时间</th><th>Loop</th><th>纬度</th><th>经度</th><th>可见星</th><th>有效星</th><th>HDOP</th><th>在线</th><th>Fix</th><th>Status</th><th>Event</th><th>判定</th><th>自动识别</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       `;
@@ -1735,7 +1749,7 @@
       const pairedRows = alignment.rows
         .filter((row) => row.mqtt && isValidMqttPoint(row.mqtt) && isCoordinateFinite(row.phone))
         .sort((a, b) => toDate(phoneTimeValue(a.phone)) - toDate(phoneTimeValue(b.phone)));
-      const mqttRecords = sortByTime(session.mqttRecords, "timestamp");
+      const mqttRecords = sortMqttByCollectionTime(session.mqttRecords);
       const validMqttRecords = pairedRows.map((row) => row.mqtt);
       const validMqttIds = new Set(validMqttRecords.map((record) => record.id));
       const phoneRecords = sortPhonesByCollectionTime(session.phoneRecords).filter(isCoordinateFinite);
@@ -1878,12 +1892,13 @@
       const session = selectedSession();
       if (!session) return [];
       const rows = [];
-      for (const item of sortByTime(session.mqttRecords, "timestamp")) {
+      for (const item of sortMqttByCollectionTime(session.mqttRecords)) {
         rows.push({
           source: "MQTT",
           session: session.name,
           caseName: session.caseName,
-          time: item.timestamp,
+          time: mqttTimeValue(item),
+          gnssUtcTime: item.gnssUtcTime || "",
           mqttReceivedAt: item.receivedAt,
           loop: item.loop,
           latitude: item.latitude,
@@ -1958,9 +1973,10 @@
 
       addRows(
         "MQTT数据",
-        ["time", "mqttReceivedAt", "loop", "latitude", "longitude", "visibleSatellites", "usedSatellites", "hdop", "onlineStatus", "fix", "status", "event", "level", "alerts"],
-        sortByTime(session.mqttRecords, "timestamp").map((item) => ({
-          time: item.timestamp,
+        ["time", "gnssUtcTime", "mqttReceivedAt", "loop", "latitude", "longitude", "visibleSatellites", "usedSatellites", "hdop", "onlineStatus", "fix", "status", "event", "level", "alerts"],
+        sortMqttByCollectionTime(session.mqttRecords).map((item) => ({
+          time: mqttTimeValue(item),
+          gnssUtcTime: item.gnssUtcTime || "",
           mqttReceivedAt: item.receivedAt,
           loop: item.loop,
           latitude: item.latitude,
@@ -2077,7 +2093,7 @@
         <div>GNSS经纬度：${fixed(point.record.latitude, 7)}, ${fixed(point.record.longitude, 7)}</div>
         <div>事件状态：${point.eventState}</div>
         <div>有效卫星数：${point.record.usedSatellites || "NaN"}</div>
-        <div>GNSS采集时间：${formatDate(point.record.timestamp)}</div>
+        <div>GNSS采集时间：${formatDate(mqttTimeValue(point.record))}</div>
         <div>手机采集时间：${formatDate(phoneTime)}</div>
       `;
       const rect = els.trajectoryWrap.getBoundingClientRect();
