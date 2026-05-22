@@ -1,0 +1,2236 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GNSS 稳定性测试记录页</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f4f7fb;
+      color: #172033;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: #f4f7fb;
+    }
+
+    main {
+      width: min(100%, 1180px);
+      margin: 0 auto;
+      padding: 18px;
+    }
+
+    header,
+    .panel {
+      margin-bottom: 14px;
+    }
+
+    .panel {
+      padding: 16px;
+      border: 1px solid #dfe7f2;
+      border-radius: 8px;
+      background: #ffffff;
+      box-shadow: 0 8px 24px rgba(32, 45, 70, 0.08);
+    }
+
+    h1,
+    h2,
+    h3 {
+      margin: 0;
+      line-height: 1.25;
+    }
+
+    h1 {
+      font-size: 24px;
+    }
+
+    h2 {
+      font-size: 18px;
+    }
+
+    h3 {
+      font-size: 15px;
+    }
+
+    p {
+      margin: 8px 0 0;
+      color: #5d687a;
+      line-height: 1.55;
+      font-size: 14px;
+    }
+
+    button,
+    input,
+    select {
+      min-height: 42px;
+      border-radius: 8px;
+      font: inherit;
+      font-size: 14px;
+    }
+
+    button {
+      appearance: none;
+      border: 0;
+      background: #1f6fb2;
+      color: #ffffff;
+      font-weight: 700;
+      padding: 10px 14px;
+      cursor: pointer;
+      box-shadow: 0 8px 18px rgba(31, 111, 178, 0.18);
+    }
+
+    button.danger {
+      background: #b94a48;
+      box-shadow: 0 8px 18px rgba(185, 74, 72, 0.16);
+    }
+
+    button.ghost {
+      background: #eef3f8;
+      color: #243247;
+      border: 1px solid #d7e0ec;
+      box-shadow: none;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.62;
+      box-shadow: none;
+    }
+
+    input,
+    select {
+      width: 100%;
+      border: 1px solid #d7e0ec;
+      background: #ffffff;
+      color: #172033;
+      padding: 9px 10px;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      color: #5d687a;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .backup-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 10px;
+      align-items: end;
+      margin-top: 12px;
+    }
+
+    .backup-status {
+      color: #5d687a;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .metric {
+      min-width: 0;
+      padding: 12px;
+      border: 1px solid #e3eaf3;
+      border-radius: 8px;
+      background: #fbfcff;
+    }
+
+    .metric .name {
+      color: #697589;
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+
+    .metric .value {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      font-size: 20px;
+      font-weight: 750;
+      font-variant-numeric: tabular-nums;
+      color: #101828;
+    }
+
+    .note {
+      margin-top: 12px;
+      min-height: 42px;
+      border-left: 4px solid #9bb3ce;
+      border-radius: 6px;
+      background: #f1f5fa;
+      padding: 10px 12px;
+      color: #415066;
+      line-height: 1.5;
+      font-size: 14px;
+    }
+
+    .note.error {
+      border-left-color: #c23b3b;
+      background: #fff1f1;
+      color: #803030;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+      font-size: 13px;
+      color: #46556b;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      border: 1px solid #d7e0ec;
+      background: #f7f9fc;
+    }
+
+    .tag.ok {
+      background: #ecf8f0;
+      border-color: #b9dec3;
+      color: #20623a;
+    }
+
+    .tag.warn {
+      background: #fff8df;
+      border-color: #ead58e;
+      color: #795b08;
+    }
+
+    .tag.danger {
+      background: #fff0f0;
+      border-color: #edb0b0;
+      color: #8a2d2d;
+    }
+
+    .event-groups {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .event-group {
+      border: 1px solid #e3eaf3;
+      border-radius: 8px;
+      padding: 12px;
+      background: #fbfcff;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .chips button {
+      min-height: 34px;
+      padding: 7px 10px;
+      background: #eef3f8;
+      color: #243247;
+      border: 1px solid #d7e0ec;
+      box-shadow: none;
+      font-weight: 650;
+    }
+
+    .records {
+      margin-top: 12px;
+      overflow-x: auto;
+      border: 1px solid #e2e8f2;
+      border-radius: 8px;
+      background: #ffffff;
+    }
+
+    table {
+      width: 100%;
+      min-width: 980px;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th,
+    td {
+      padding: 9px 10px;
+      border-bottom: 1px solid #e8edf4;
+      text-align: left;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+
+    th {
+      background: #f7f9fc;
+      color: #46556b;
+      font-weight: 700;
+    }
+
+    tr.ok {
+      background: #f6fcf8;
+    }
+
+    tr.warn {
+      background: #fffaf0;
+    }
+
+    tr.danger {
+      background: #fff5f5;
+    }
+
+    .raw {
+      max-height: 150px;
+      overflow: auto;
+      margin: 12px 0 0;
+      padding: 12px;
+      border: 1px solid #e2e8f2;
+      border-radius: 8px;
+      background: #101828;
+      color: #dce8f8;
+      font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+
+    .empty {
+      padding: 12px;
+      color: #697589;
+      font-size: 14px;
+    }
+
+    .table-block {
+      margin-top: 14px;
+    }
+
+    .table-block:first-child {
+      margin-top: 0;
+    }
+
+    .table-block h3 {
+      margin: 0 0 8px;
+      color: #243247;
+    }
+
+    .trajectory-panel {
+      margin-top: 16px;
+    }
+
+    .viz-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .viz-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .viz-controls button {
+      min-width: 42px;
+      min-height: 36px;
+      padding: 7px 10px;
+    }
+
+    .viz-summary {
+      color: #5d687a;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .trajectory-wrap {
+      position: relative;
+      margin-top: 10px;
+      height: 460px;
+      overflow: hidden;
+      border: 1px solid #dbe4ef;
+      border-radius: 8px;
+      background: #fbfcff;
+      touch-action: none;
+    }
+
+    #trajectoryCanvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+    }
+
+    #trajectoryCanvas.dragging {
+      cursor: grabbing;
+    }
+
+    .trajectory-popup {
+      position: absolute;
+      z-index: 2;
+      min-width: 230px;
+      max-width: min(320px, calc(100% - 24px));
+      padding: 10px 12px;
+      border: 1px solid #c9d5e4;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 10px 28px rgba(20, 32, 52, 0.18);
+      color: #243247;
+      font-size: 13px;
+      line-height: 1.55;
+      pointer-events: none;
+    }
+
+    .trajectory-popup.hidden {
+      display: none;
+    }
+
+    .trajectory-popup strong {
+      display: block;
+      margin-bottom: 4px;
+      color: #172033;
+    }
+
+    .viz-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+      color: #46556b;
+      font-size: 13px;
+    }
+
+    .viz-key {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .viz-swatch {
+      width: 18px;
+      height: 4px;
+      border-radius: 999px;
+      background: #999999;
+    }
+
+    .viz-swatch.phone {
+      background: #d93025;
+    }
+
+    .viz-swatch.mqtt {
+      background: #1f6fb2;
+    }
+
+    .viz-swatch.invalid {
+      width: 10px;
+      height: 10px;
+      background: #9aa3ad;
+    }
+
+    .viz-swatch.latest-phone {
+      background: #111827;
+    }
+
+    .viz-swatch.latest-mqtt {
+      background: #7c3aed;
+    }
+
+    @media (max-width: 820px) {
+      main {
+        padding: 12px;
+      }
+
+      .grid,
+      .form-grid,
+      .backup-grid,
+      .event-groups {
+        grid-template-columns: 1fr;
+      }
+
+      button {
+        flex: 1 1 auto;
+      }
+
+      .trajectory-wrap {
+        height: 360px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>GNSS 稳定性测试记录页</h1>
+      <p>页面订阅 MQTTX 同源日志。收到包含 <strong>gnss</strong> 对象的 MQTT 数据后自动开始新一轮测试，并同步触发手机定位；结束测试由人工点击。</p>
+    </header>
+
+    <section class="panel" aria-label="测试控制">
+      <h2>测试控制</h2>
+      <div class="form-grid">
+        <label>当前工况
+          <select id="caseSelect"></select>
+        </label>
+        <label>查看轮次
+          <select id="sessionSelect"></select>
+        </label>
+        <label>测试人员
+          <input id="testerInput" placeholder="填写测试人员">
+        </label>
+        <label>设备/备注
+          <input id="deviceInput" placeholder="设备型号、固件或环境">
+        </label>
+        <label>MQTT Topic
+          <input id="mqttTopicInput" value="DEVICE_REPORT/235829352" placeholder="例如 DEVICE_REPORT/235829352">
+        </label>
+      </div>
+      <div class="toolbar">
+        <button class="danger" id="stopButton" type="button" disabled>结束当前测试</button>
+        <button class="ghost" id="phoneButton" type="button">手动同步手机定位</button>
+        <button class="ghost" id="mqttButton" type="button">订阅 MQTT</button>
+        <button class="ghost" id="exportCsvButton" type="button">导出所选轮 CSV</button>
+        <button class="ghost" id="exportJsonButton" type="button">导出所选轮 JSON</button>
+        <button class="danger" id="deleteButton" type="button">删除所选轮</button>
+      </div>
+      <div class="backup-grid" aria-label="远程备份">
+        <label>备份方式
+          <select id="backupModeSelect">
+            <option value="">关闭</option>
+            <option value="supabase">Supabase</option>
+            <option value="post">自定义 POST</option>
+          </select>
+        </label>
+        <label>Supabase Project URL
+          <input id="supabaseUrlInput" placeholder="https://xxxx.supabase.co">
+        </label>
+        <label>Supabase anon key
+          <input id="supabaseKeyInput" placeholder="粘贴 anon public key">
+        </label>
+        <label>自定义 POST 地址
+          <input id="backupUrlInput" placeholder="例如 https://your-domain.example/api/ingest">
+        </label>
+        <button class="ghost" id="saveBackupButton" type="button">保存备份配置</button>
+        <button class="ghost" id="testBackupButton" type="button">测试备份</button>
+      </div>
+      <div class="backup-status" id="backupStatus">远程备份默认关闭；不填写地址时不会上传任何数据。</div>
+      <div class="note" id="message">等待 MQTT 数据。第一条包含 gnss 对象的数据会自动开始测试。</div>
+    </section>
+
+    <section class="panel" aria-label="实时状态">
+      <h2>实时状态</h2>
+      <div class="grid">
+        <div class="metric">
+          <div class="name">MQTT 状态</div>
+          <div class="value" id="mqttStatus">等待连接</div>
+        </div>
+        <div class="metric">
+          <div class="name">当前轮次</div>
+          <div class="value" id="activeSession">未开始</div>
+        </div>
+        <div class="metric">
+          <div class="name">MQTT / 手机记录</div>
+          <div class="value" id="recordCount">0 / 0</div>
+        </div>
+        <div class="metric">
+          <div class="name">最近判定</div>
+          <div class="value" id="latestLevel">--</div>
+        </div>
+      </div>
+      <div class="grid">
+        <div class="metric">
+          <div class="name">MQTT Latitude</div>
+          <div class="value" id="mqttLatitude">--</div>
+        </div>
+        <div class="metric">
+          <div class="name">MQTT Longitude</div>
+          <div class="value" id="mqttLongitude">--</div>
+        </div>
+        <div class="metric">
+          <div class="name">手机 Latitude</div>
+          <div class="value" id="phoneLatitude">--</div>
+        </div>
+        <div class="metric">
+          <div class="name">手机 Longitude</div>
+          <div class="value" id="phoneLongitude">--</div>
+        </div>
+      </div>
+      <div class="grid">
+        <div class="metric">
+          <div class="name">时间差</div>
+          <div class="value" id="timeDelta">--</div>
+        </div>
+        <div class="metric">
+          <div class="name">对标误差</div>
+          <div class="value" id="distanceValue">--</div>
+        </div>
+        <div class="metric">
+          <div class="name">可见/有效卫星</div>
+          <div class="value" id="satelliteValue">--</div>
+        </div>
+        <div class="metric">
+          <div class="name">在线/Fix</div>
+          <div class="value" id="onlineValue">--</div>
+        </div>
+      </div>
+      <div class="legend">
+        <span class="tag ok">绿色：定位有效，基础指标正常</span>
+        <span class="tag warn">黄色：弱定位、HDOP偏高、误差/时间差偏大或日志疑似缺失</span>
+        <span class="tag danger">红色：离线、无Fix、经纬度为空、HDOP极差或明显大跳点</span>
+      </div>
+      <pre class="raw" id="rawMqtt">等待 MQTT 日志。</pre>
+    </section>
+
+    <section class="panel" aria-label="动作和场景标注">
+      <h2>场景 / 动作标注</h2>
+      <p>这里只保留人工场景和动作标注。异常由页面根据 MQTT 数据自动识别，判定关注通过表格颜色表示。</p>
+      <div class="event-groups" id="eventGroups"></div>
+    </section>
+
+    <section class="panel" aria-label="所选轮次数据">
+      <h2>所选轮次数据</h2>
+      <p>显示和导出均按 MQTT 数据、手机定位数据、场景/动作标注的顺序排列，标注直接接在数据段下面。</p>
+      <div class="table-block">
+        <h3>MQTT 数据</h3>
+        <div class="records" id="mqttRecords"></div>
+      </div>
+      <div class="table-block">
+        <h3>手机定位数据</h3>
+        <div class="records" id="phoneRecords"></div>
+      </div>
+      <div class="table-block">
+        <h3>场景 / 动作标注</h3>
+        <div class="records" id="markRecords"></div>
+      </div>
+      <div class="trajectory-panel" aria-label="轨迹可视化">
+        <h3>轨迹可视化</h3>
+        <div class="viz-toolbar">
+          <div class="viz-summary" id="trajectorySummary">等待可视化数据。</div>
+          <div class="viz-controls" aria-label="轨迹缩放控制">
+            <button class="ghost" id="zoomInButton" type="button" title="放大">+</button>
+            <button class="ghost" id="zoomOutButton" type="button" title="缩小">-</button>
+            <button class="ghost" id="resetViewButton" type="button">重置视图</button>
+          </div>
+        </div>
+        <div class="trajectory-wrap" id="trajectoryWrap">
+          <canvas id="trajectoryCanvas"></canvas>
+          <div class="trajectory-popup hidden" id="trajectoryPopup"></div>
+        </div>
+        <div class="viz-legend">
+          <span class="viz-key"><span class="viz-swatch phone"></span>手机轨迹</span>
+          <span class="viz-key"><span class="viz-swatch mqtt"></span>MQTT 有效轨迹</span>
+          <span class="viz-key"><span class="viz-swatch latest-phone"></span>最新手机段</span>
+          <span class="viz-key"><span class="viz-swatch latest-mqtt"></span>最新MQTT段</span>
+          <span class="viz-key"><span class="viz-swatch invalid"></span>MQTT NaN 点</span>
+          <span class="viz-key"><span class="viz-swatch" style="background: rgba(130, 90, 30, 0.62);"></span>红蓝误差连线</span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="mqtt.min.js"></script>
+  <script>
+    const MQTT_BROKER_URL = "wss://broker.emqx.io:8084/mqtt";
+    const DEFAULT_MQTT_TOPIC = "DEVICE_REPORT/235829352";
+    const STORAGE_KEY = "gnss-stability-test-v3";
+    const BACKUP_MODE_KEY = "gnss-stability-backup-mode-v1";
+    const BACKUP_URL_KEY = "gnss-stability-backup-url-v1";
+    const SUPABASE_URL_KEY = "gnss-stability-supabase-url-v1";
+    const SUPABASE_ANON_KEY = "gnss-stability-supabase-anon-key-v1";
+    const PHONE_OPTIONS = {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0
+    };
+    const MAX_VISUAL_TIME_DELTA_S = 15;
+
+    const testCases = [
+      "工况1：静态遮挡稳定性测试",
+      "工况2：动态姿态晃动稳定性测试",
+      "工况3：弱信号常驻场景稳定性测试",
+      "工况4：楼内↔楼外双向切换测试",
+      "工况5：低功耗休眠唤醒稳定性测试",
+      "工况6：长时间连续运行稳定性测试"
+    ];
+
+    const eventGroups = [
+      {
+        name: "场景标注",
+        items: ["大树浓密树荫", "居民楼墙根", "楼栋夹缝背阴", "单元门口半遮挡", "楼道深处", "室外开阔区域", "进楼", "出楼", "进电梯", "出电梯"]
+      },
+      {
+        name: "动作标注",
+        items: ["厚毛绒遮挡", "低头含胸静坐", "慢走+快走", "快速小跑", "折返急转弯", "低头/转身/扭动", "设备倾斜/倒置", "静置观察", "正常步行", "小范围走动"]
+      }
+    ];
+
+    const els = {
+      caseSelect: document.querySelector("#caseSelect"),
+      sessionSelect: document.querySelector("#sessionSelect"),
+      testerInput: document.querySelector("#testerInput"),
+      deviceInput: document.querySelector("#deviceInput"),
+      mqttTopicInput: document.querySelector("#mqttTopicInput"),
+      stopButton: document.querySelector("#stopButton"),
+      phoneButton: document.querySelector("#phoneButton"),
+      mqttButton: document.querySelector("#mqttButton"),
+      exportCsvButton: document.querySelector("#exportCsvButton"),
+      exportJsonButton: document.querySelector("#exportJsonButton"),
+      deleteButton: document.querySelector("#deleteButton"),
+      backupModeSelect: document.querySelector("#backupModeSelect"),
+      backupUrlInput: document.querySelector("#backupUrlInput"),
+      supabaseUrlInput: document.querySelector("#supabaseUrlInput"),
+      supabaseKeyInput: document.querySelector("#supabaseKeyInput"),
+      saveBackupButton: document.querySelector("#saveBackupButton"),
+      testBackupButton: document.querySelector("#testBackupButton"),
+      backupStatus: document.querySelector("#backupStatus"),
+      message: document.querySelector("#message"),
+      mqttStatus: document.querySelector("#mqttStatus"),
+      activeSession: document.querySelector("#activeSession"),
+      recordCount: document.querySelector("#recordCount"),
+      latestLevel: document.querySelector("#latestLevel"),
+      mqttLatitude: document.querySelector("#mqttLatitude"),
+      mqttLongitude: document.querySelector("#mqttLongitude"),
+      phoneLatitude: document.querySelector("#phoneLatitude"),
+      phoneLongitude: document.querySelector("#phoneLongitude"),
+      timeDelta: document.querySelector("#timeDelta"),
+      distanceValue: document.querySelector("#distanceValue"),
+      satelliteValue: document.querySelector("#satelliteValue"),
+      onlineValue: document.querySelector("#onlineValue"),
+      rawMqtt: document.querySelector("#rawMqtt"),
+      eventGroups: document.querySelector("#eventGroups"),
+      mqttRecords: document.querySelector("#mqttRecords"),
+      phoneRecords: document.querySelector("#phoneRecords"),
+      markRecords: document.querySelector("#markRecords"),
+      trajectorySummary: document.querySelector("#trajectorySummary"),
+      trajectoryWrap: document.querySelector("#trajectoryWrap"),
+      trajectoryCanvas: document.querySelector("#trajectoryCanvas"),
+      trajectoryPopup: document.querySelector("#trajectoryPopup"),
+      zoomInButton: document.querySelector("#zoomInButton"),
+      zoomOutButton: document.querySelector("#zoomOutButton"),
+      resetViewButton: document.querySelector("#resetViewButton")
+    };
+
+    let state = loadState();
+    let activeSessionId = state.activeSessionId || null;
+    let selectedSessionId = activeSessionId || state.sessions.at(-1)?.id || "";
+    let mqttClient = null;
+    let isPhoneLocating = false;
+    let lastMqtt = null;
+    let lastPhone = null;
+    let pendingMqttRecordId = null;
+    let backupMode = localStorage.getItem(BACKUP_MODE_KEY) || "";
+    let backupUrl = localStorage.getItem(BACKUP_URL_KEY) || "";
+    let supabaseUrl = localStorage.getItem(SUPABASE_URL_KEY) || "";
+    let supabaseAnonKey = localStorage.getItem(SUPABASE_ANON_KEY) || "";
+    const trajectoryView = {
+      scale: 1,
+      offsetX: 0,
+      offsetY: 0,
+      baseScale: 1,
+      centerX: 0,
+      centerY: 0,
+      pointIndex: [],
+      isDragging: false,
+      dragStartX: 0,
+      dragStartY: 0,
+      dragOffsetX: 0,
+      dragOffsetY: 0,
+      sessionId: "",
+      hasDrawing: false,
+      autoFollowPaused: false
+    };
+
+    function loadState() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || { sessions: [], activeSessionId: null };
+      } catch {
+        return { sessions: [], activeSessionId: null };
+      }
+    }
+
+    function saveState() {
+      state.activeSessionId = activeSessionId;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function setBackupStatus(text, isError = false) {
+      els.backupStatus.textContent = text;
+      els.backupStatus.style.color = isError ? "#803030" : "#5d687a";
+    }
+
+    function supabaseEndpoint() {
+      return `${supabaseUrl.replace(/\/+$/, "")}/rest/v1/gnss_events`;
+    }
+
+    function saveBackupUrl() {
+      backupMode = els.backupModeSelect.value;
+      backupUrl = els.backupUrlInput.value.trim();
+      supabaseUrl = els.supabaseUrlInput.value.trim();
+      supabaseAnonKey = els.supabaseKeyInput.value.trim();
+      localStorage.setItem(BACKUP_MODE_KEY, backupMode);
+      if (backupMode === "supabase") {
+        localStorage.setItem(SUPABASE_URL_KEY, supabaseUrl);
+        localStorage.setItem(SUPABASE_ANON_KEY, supabaseAnonKey);
+        setBackupStatus(supabaseUrl && supabaseAnonKey
+          ? `Supabase 备份已开启：${supabaseUrl}`
+          : "Supabase 备份配置不完整，请填写 Project URL 和 anon key。", !(supabaseUrl && supabaseAnonKey));
+      } else if (backupMode === "post" && backupUrl) {
+        localStorage.setItem(BACKUP_URL_KEY, backupUrl);
+        setBackupStatus(`自定义 POST 备份已开启：${backupUrl}`);
+      } else {
+        backupMode = "";
+        localStorage.removeItem(BACKUP_MODE_KEY);
+        localStorage.removeItem(BACKUP_URL_KEY);
+        localStorage.removeItem(SUPABASE_URL_KEY);
+        localStorage.removeItem(SUPABASE_ANON_KEY);
+        setBackupStatus("远程备份已关闭；当前数据仍只保存在本机浏览器。");
+      }
+    }
+
+    function backupPayload(kind, session, payload) {
+      if (!backupMode || !session) return;
+      const body = {
+        kind,
+        savedAt: new Date().toISOString(),
+        session: {
+          id: session.id,
+          name: session.name,
+          caseName: session.caseName,
+          tester: session.tester,
+          device: session.device,
+          startedAt: session.startedAt,
+          endedAt: session.endedAt
+        },
+        payload
+      };
+      const target = backupMode === "supabase" ? supabaseEndpoint() : backupUrl;
+      if (!target || (backupMode === "supabase" && !supabaseAnonKey)) return;
+      const headers = backupMode === "supabase"
+        ? {
+            "Content-Type": "application/json",
+            apikey: supabaseAnonKey,
+            Authorization: `Bearer ${supabaseAnonKey}`,
+            Prefer: "return=minimal"
+          }
+        : { "Content-Type": "application/json" };
+      const requestBody = backupMode === "supabase"
+        ? JSON.stringify({
+            kind: body.kind,
+            saved_at: body.savedAt,
+            session_id: body.session.id,
+            session: body.session,
+            payload: body.payload,
+            client: { userAgent: navigator.userAgent }
+          })
+        : JSON.stringify(body);
+      fetch(target, {
+        method: "POST",
+        headers,
+        body: requestBody,
+        keepalive: true
+      })
+        .then((response) => {
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          setBackupStatus(`远程备份成功：${kind} ${formatDate(body.savedAt)}`);
+        })
+        .catch((error) => {
+          setBackupStatus(`远程备份失败：${error.message}`, true);
+        });
+    }
+
+    function testBackup() {
+      saveBackupUrl();
+      if (!backupMode) {
+        setBackupStatus("请先选择并填写远程备份配置。", true);
+        return;
+      }
+      const pseudoSession = selectedSession() || activeSession() || {
+        id: "test",
+        name: "测试连接",
+        caseName: "",
+        tester: "",
+        device: "",
+        startedAt: "",
+        endedAt: ""
+      };
+      backupPayload("healthcheck", pseudoSession, {
+        message: "GNSS stability webpage backup test",
+        userAgent: navigator.userAgent
+      });
+    }
+
+    function activeSession() {
+      return state.sessions.find((session) => session.id === activeSessionId) || null;
+    }
+
+    function selectedSession() {
+      return state.sessions.find((session) => session.id === selectedSessionId) || null;
+    }
+
+    function setMessage(text, isError = false) {
+      els.message.textContent = text;
+      els.message.classList.toggle("error", isError);
+    }
+
+    function formatDate(value) {
+      const date = value ? new Date(value) : null;
+      if (!date || Number.isNaN(date.getTime())) {
+        return "";
+      }
+      return new Intl.DateTimeFormat("zh-CN", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit"
+      }).format(date);
+    }
+
+    function fixed(value, digits = 6) {
+      const number = Number(value);
+      return Number.isFinite(number) ? number.toFixed(digits) : "--";
+    }
+
+    function displayValue(value) {
+      return value === "" || value == null ? "--" : String(value);
+    }
+
+    function toDate(value) {
+      const date = value ? new Date(value) : new Date();
+      return Number.isNaN(date.getTime()) ? new Date() : date;
+    }
+
+    function phoneTimeValue(phone) {
+      return phone?.receivedAt || phone?.timestamp || "";
+    }
+
+    function mqttTimeValue(record) {
+      return record?.receivedAt || record?.timestamp || "";
+    }
+
+    function sortMqttByCollectionTime(items) {
+      return [...items].sort((a, b) => toDate(mqttTimeValue(a)) - toDate(mqttTimeValue(b)));
+    }
+
+    function sortPhonesByCollectionTime(items) {
+      return [...items].sort((a, b) => toDate(phoneTimeValue(a)) - toDate(phoneTimeValue(b)));
+    }
+
+    function haversineMeters(aLat, aLon, bLat, bLon) {
+      const nums = [aLat, aLon, bLat, bLon].map(Number);
+      if (!nums.every(Number.isFinite)) {
+        return null;
+      }
+      const [lat1, lon1, lat2, lon2] = nums;
+      const toRad = (deg) => deg * Math.PI / 180;
+      const r = 6371000;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const s1 = Math.sin(dLat / 2);
+      const s2 = Math.sin(dLon / 2);
+      const a = s1 * s1 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * s2 * s2;
+      return 2 * r * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function coordinateDeltaMeters(phone, mqttRecord) {
+      if (!isCoordinateFinite(phone) || !isCoordinateFinite(mqttRecord)) {
+        return null;
+      }
+      const lat = (Number(phone.latitude) + Number(mqttRecord.latitude)) / 2;
+      const metersPerDegLat = 111320;
+      const metersPerDegLon = 111320 * Math.cos(lat * Math.PI / 180);
+      const eastM = (Number(mqttRecord.longitude) - Number(phone.longitude)) * metersPerDegLon;
+      const northM = (Number(mqttRecord.latitude) - Number(phone.latitude)) * metersPerDegLat;
+      const distanceM = haversineMeters(phone.latitude, phone.longitude, mqttRecord.latitude, mqttRecord.longitude);
+      return {
+        eastM: Math.round(eastM * 10) / 10,
+        northM: Math.round(northM * 10) / 10,
+        distanceM: Number.isFinite(distanceM) ? Math.round(distanceM * 10) / 10 : null
+      };
+    }
+
+    function isCoordinateFinite(record) {
+      return Number.isFinite(Number(record?.latitude)) && Number.isFinite(Number(record?.longitude));
+    }
+
+    function isZeroCoordinate(record) {
+      return Number(record?.latitude) === 0 && Number(record?.longitude) === 0;
+    }
+
+    function isMqttNanPoint(record) {
+      return isZeroCoordinate(record) && !(record.alerts || []).includes("50m大跳点");
+    }
+
+    function isValidMqttPoint(record) {
+      return isCoordinateFinite(record) && !isMqttNanPoint(record);
+    }
+
+    function hdopPrecisionPercent(hdop) {
+      const value = Number(hdop);
+      if (!Number.isFinite(value) || value < 0) return null;
+      const percent = Math.max(0, Math.min(100, 100 / Math.max(1, value)));
+      return Math.round(percent * 10) / 10;
+    }
+
+    function buildAlignedRecords(session) {
+      const phones = sortPhonesByCollectionTime(session?.phoneRecords || []);
+      const mqttRecords = sortMqttByCollectionTime(session?.mqttRecords || []);
+      const byMqttId = new Map();
+      const rows = phones.map((phone) => {
+        const phoneTime = toDate(phoneTimeValue(phone)).getTime();
+        let nearest = null;
+        let nearestDelta = Infinity;
+        for (const mqttRecord of mqttRecords) {
+          const delta = Math.abs(phoneTime - toDate(mqttTimeValue(mqttRecord)).getTime()) / 1000;
+          if (delta < nearestDelta) {
+            nearest = mqttRecord;
+            nearestDelta = delta;
+          }
+        }
+        const linkedMqtt = nearest && nearestDelta <= MAX_VISUAL_TIME_DELTA_S ? nearest : null;
+        const distance = linkedMqtt && isValidMqttPoint(linkedMqtt)
+          ? haversineMeters(phone.latitude, phone.longitude, linkedMqtt.latitude, linkedMqtt.longitude)
+          : null;
+        const row = {
+          phone,
+          mqtt: linkedMqtt,
+          timeDeltaS: linkedMqtt ? Math.round((toDate(phoneTimeValue(phone)) - toDate(mqttTimeValue(linkedMqtt))) / 1000) : null,
+          distanceM: Number.isFinite(distance) ? Math.round(distance * 10) / 10 : null
+        };
+        if (linkedMqtt) {
+          const existing = byMqttId.get(linkedMqtt.id);
+          if (!existing || Math.abs(row.timeDeltaS) < Math.abs(existing.timeDeltaS)) {
+            byMqttId.set(linkedMqtt.id, row);
+          }
+        }
+        return row;
+      });
+      return { rows, byMqttId };
+    }
+
+    function eventStateForMqtt(session, mqttRecord) {
+      const marks = sortByTime(session?.marks || [], "timestamp")
+        .filter((item) => toDate(item.timestamp) <= toDate(mqttTimeValue(mqttRecord)));
+      const scene = marks.filter((item) => item.type === "场景标注").at(-1)?.label || "";
+      const action = marks.filter((item) => item.type === "动作标注").at(-1)?.label || "";
+      if (scene && action) return `${scene} ${action}`;
+      if (scene || action) return scene || action;
+      return "未标注场景/动作";
+    }
+
+    function projectPoint(record, origin) {
+      const lat = Number(record.latitude);
+      const lon = Number(record.longitude);
+      const metersPerDegLat = 111320;
+      const metersPerDegLon = 111320 * Math.cos(origin.lat * Math.PI / 180);
+      return {
+        x: (lon - origin.lon) * metersPerDegLon,
+        y: (lat - origin.lat) * metersPerDegLat,
+        record
+      };
+    }
+
+    function hasField(object, key) {
+      return object && Object.prototype.hasOwnProperty.call(object, key);
+    }
+
+    function numericOrNull(value) {
+      if (value == null || value === "") return null;
+      const number = Number(value);
+      return Number.isFinite(number) ? number : null;
+    }
+
+    function normalizeMqttPayload(topic, text) {
+      const raw = text.trim();
+      let jsonText = raw;
+      if (!raw.startsWith("{")) {
+        const start = raw.indexOf("{");
+        const end = raw.lastIndexOf("}");
+        if (start === -1 || end === -1 || end <= start) {
+          throw new Error("MQTT 日志中未找到 JSON。");
+        }
+        jsonText = raw.slice(start, end + 1);
+      }
+
+      const payload = JSON.parse(jsonText);
+      const receivedAt = new Date().toISOString();
+      const gnss = payload.gnss && typeof payload.gnss === "object" ? payload.gnss : null;
+      const source = gnss || payload;
+      const latitude = numericOrNull(source.latitude);
+      const longitude = numericOrNull(source.longitude);
+      const isLegacyGnss = !gnss && (hasField(payload, "longitude") || hasField(payload, "latitude"));
+      const hasGnssData = Boolean(gnss) || isLegacyGnss;
+      const satellites = source.satellites_num ?? payload.visible_satellites ?? "";
+      const valid = gnss ? gnss.valid === true : null;
+
+      if (!hasGnssData) {
+        return null;
+      }
+
+      return {
+        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        topic,
+        receivedAt,
+        timestamp: receivedAt,
+        gnssUtcTime: gnss?.utc_time || payload.utc_time || "",
+        latitude,
+        longitude,
+        loop: payload.seq ?? payload.loop ?? "",
+        speed: source.speed_kph ?? payload.speed ?? "",
+        trackedSatelliteRecords: payload.tracked_satellite_records ?? "",
+        onlineStatus: payload.online_status ?? (payload.type === "device_report" ? 1 : ""),
+        status: source.status ?? payload.status ?? "",
+        hdop: source.hdop ?? payload.hdop ?? "",
+        fix: gnss ? (valid ? 1 : 0) : (payload.fix ?? ""),
+        visibleSatellites: satellites,
+        usedSatellites: payload.used_satellites ?? satellites,
+        gpsErrorM: payload.gps_error_m ?? "",
+        event: payload.report_type ?? payload.event ?? "",
+        gnssValid: valid,
+        gnssQuality: source.quality ?? "",
+        gnssFixMode: source.fix_mode ?? "",
+        hasGnssData,
+        raw: text,
+        payload
+      };
+    }
+
+    function detectMqttStatus(record, previous) {
+      const alerts = [];
+      const used = Number(record.usedSatellites);
+      const visible = Number(record.visibleSatellites);
+      const hdop = Number(record.hdop);
+      const online = Number(record.onlineStatus);
+      const fix = Number(record.fix);
+      const latOk = Number.isFinite(Number(record.latitude));
+      const lonOk = Number.isFinite(Number(record.longitude));
+
+      const onlineKnown = record.onlineStatus !== "" && record.onlineStatus != null;
+      const fixKnown = record.fix !== "" && record.fix != null;
+      const status = String(record.status || "").toLowerCase();
+
+      if (onlineKnown && online !== 1) alerts.push("设备离线");
+      if ((fixKnown && fix !== 1) || record.gnssValid === false || ["v", "wait", "not_fixed", "no_fix"].includes(status) || record.event === "WAIT") alerts.push("无有效Fix");
+      if (!latOk || !lonOk) alerts.push("经纬度为空");
+      if (Number.isFinite(visible) && visible === 0) alerts.push("无可见卫星");
+      if (Number.isFinite(used) && used < 4) alerts.push("有效卫星不足4");
+      if (Number.isFinite(hdop) && hdop >= 10) alerts.push("HDOP极差");
+      else if (Number.isFinite(hdop) && hdop >= 4) alerts.push("HDOP偏高");
+      if (Number.isFinite(Number(record.gpsErrorM)) && Number(record.gpsErrorM) > 50) alerts.push("GPS误差超过50m");
+      if (previous && Number.isFinite(Number(record.loop)) && Number.isFinite(Number(previous.loop))) {
+        const gap = Number(record.loop) - Number(previous.loop);
+        if (gap > 1) alerts.push(`日志疑似缺失${gap - 1}条`);
+      }
+      if (previous && latOk && lonOk && Number.isFinite(Number(previous.latitude)) && Number.isFinite(Number(previous.longitude))) {
+        const jump = haversineMeters(previous.latitude, previous.longitude, record.latitude, record.longitude);
+        if (Number.isFinite(jump) && jump > 50) alerts.push("50m大跳点");
+      }
+
+      const danger = alerts.some((item) => ["设备离线", "无有效Fix", "经纬度为空", "无可见卫星", "HDOP极差", "GPS误差超过50m", "50m大跳点"].includes(item));
+      const warn = alerts.length > 0;
+      return {
+        level: danger ? "danger" : (warn ? "warn" : "ok"),
+        label: danger ? "异常" : (warn ? "关注" : "正常"),
+        alerts
+      };
+    }
+
+    function detectPhoneStatus(phone, linkedMqtt) {
+      const alerts = [];
+      let distance = null;
+      let timeDelta = null;
+
+      if (linkedMqtt) {
+        distance = haversineMeters(linkedMqtt.latitude, linkedMqtt.longitude, phone.latitude, phone.longitude);
+        timeDelta = Math.round((toDate(phoneTimeValue(phone)) - toDate(mqttTimeValue(linkedMqtt))) / 1000);
+        if (Number.isFinite(distance) && distance > 50) alerts.push("手机对标误差超过50m");
+        else if (Number.isFinite(distance) && distance > 20) alerts.push("手机对标误差超过20m");
+        if (Math.abs(timeDelta) > MAX_VISUAL_TIME_DELTA_S) alerts.push(`采集时间差超过${MAX_VISUAL_TIME_DELTA_S}s`);
+      }
+
+      if (Number.isFinite(Number(phone.accuracy)) && Number(phone.accuracy) > 30) {
+        alerts.push("手机精度偏低");
+      }
+
+      return {
+        distanceM: Number.isFinite(distance) ? Math.round(distance * 10) / 10 : null,
+        timeDeltaS: Number.isFinite(timeDelta) ? timeDelta : null,
+        level: alerts.length ? "warn" : "ok",
+        alerts
+      };
+    }
+
+    function ensureSession(mqttRecord) {
+      let session = activeSession();
+      if (session) {
+        return session;
+      }
+
+      const now = new Date();
+      session = {
+        id: `${now.getTime()}-${Math.random().toString(16).slice(2)}`,
+        name: `第 ${state.sessions.length + 1} 轮`,
+        caseName: els.caseSelect.value,
+        tester: els.testerInput.value.trim(),
+        device: els.deviceInput.value.trim(),
+        startedAt: mqttRecord.receivedAt,
+        endedAt: null,
+        mqttRecords: [],
+        phoneRecords: [],
+        marks: []
+      };
+      state.sessions.push(session);
+      activeSessionId = session.id;
+      selectedSessionId = session.id;
+      saveState();
+      setMessage(`${session.name} 已因 MQTT 数据自动开始。`);
+      return session;
+    }
+
+    function handleMqttMessage(topic, payloadBuffer) {
+      const text = payloadBuffer.toString();
+      let record;
+      try {
+        record = normalizeMqttPayload(topic, text);
+      } catch (error) {
+        els.rawMqtt.textContent = `Topic: ${topic}\n${text}`;
+        els.mqttStatus.textContent = "解析失败";
+        setMessage(error.message, true);
+        return;
+      }
+      if (!record) {
+        els.rawMqtt.textContent = `Topic: ${topic}\n${text}`;
+        els.mqttStatus.textContent = "等待GNSS";
+        setMessage("收到非 GNSS MQTT 消息，未更新测试数据。");
+        return;
+      }
+
+      const session = ensureSession(record);
+      const previous = session.mqttRecords.at(-1) || null;
+      const detected = detectMqttStatus(record, previous);
+      record.level = detected.level;
+      record.alerts = detected.alerts;
+      session.mqttRecords.push(record);
+      lastMqtt = record;
+      pendingMqttRecordId = record.id;
+      saveState();
+      backupPayload("mqtt", session, record);
+      updateRealtime();
+      render();
+      requestPhoneLocation("mqtt");
+    }
+
+    function requestPhoneLocation(reason = "manual") {
+      if (isPhoneLocating) return;
+      if (!("geolocation" in navigator)) {
+        setMessage("当前浏览器不支持 Geolocation API。", true);
+        return;
+      }
+
+      isPhoneLocating = true;
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const receivedAt = new Date().toISOString();
+          const geolocationTimestamp = position.timestamp
+            ? new Date(position.timestamp).toISOString()
+            : "";
+          const session = activeSession();
+          const linkedMqtt = session && pendingMqttRecordId
+            ? session.mqttRecords.find((item) => item.id === pendingMqttRecordId)
+            : lastMqtt;
+          const phone = {
+            id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+            timestamp: receivedAt,
+            receivedAt,
+            geolocationTimestamp,
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            linkedMqttId: linkedMqtt ? linkedMqtt.id : "",
+            linkedMqttLoop: linkedMqtt ? linkedMqtt.loop : ""
+          };
+          const detected = detectPhoneStatus(phone, linkedMqtt);
+          phone.level = detected.level;
+          phone.alerts = detected.alerts;
+          phone.distanceM = detected.distanceM;
+          phone.timeDeltaS = detected.timeDeltaS;
+          lastPhone = phone;
+          if (session) {
+            session.phoneRecords.push(phone);
+            saveState();
+            backupPayload("phone", session, phone);
+          }
+          updateRealtime();
+          render();
+          isPhoneLocating = false;
+          setMessage(reason === "mqtt" ? "已收到 MQTT 数据，并同步完成一次手机定位。" : "已手动同步手机定位。");
+        },
+        (error) => {
+          isPhoneLocating = false;
+          setMessage(`手机定位失败：${error.message || "请检查定位权限。"}`, true);
+          render();
+        },
+        PHONE_OPTIONS
+      );
+    }
+
+    function connectMqtt() {
+      if (!window.mqtt) {
+        els.mqttStatus.textContent = "MQTT库失败";
+        setMessage("mqtt.min.js 未加载，无法订阅 MQTT。", true);
+        return;
+      }
+      const mqttTopic = els.mqttTopicInput.value.trim();
+      if (!mqttTopic) {
+        els.mqttStatus.textContent = "等待Topic";
+        setMessage("请先输入 MQTT Topic。", true);
+        els.mqttTopicInput.focus();
+        return;
+      }
+      if (mqttClient) {
+        mqttClient.end(true);
+      }
+      els.mqttStatus.textContent = "连接中";
+      mqttClient = mqtt.connect(MQTT_BROKER_URL, {
+        clientId: `gnss_test_web_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+        clean: true,
+        connectTimeout: 10000,
+        reconnectPeriod: 5000
+      });
+      mqttClient.on("connect", () => {
+        els.mqttStatus.textContent = "已连接";
+        mqttClient.subscribe(mqttTopic, { qos: 0 }, (error) => {
+          if (error) {
+            els.mqttStatus.textContent = "订阅失败";
+            setMessage(error.message, true);
+            return;
+          }
+          els.mqttStatus.textContent = "等待日志";
+          els.rawMqtt.textContent = `已订阅 ${mqttTopic}，支持 device_report v1.0，等待 MQTTX/设备上传日志。`;
+        });
+      });
+      mqttClient.on("message", handleMqttMessage);
+      mqttClient.on("reconnect", () => {
+        els.mqttStatus.textContent = "重连中";
+      });
+      mqttClient.on("close", () => {
+        els.mqttStatus.textContent = "连接关闭";
+      });
+      mqttClient.on("error", (error) => {
+        els.mqttStatus.textContent = "连接错误";
+        setMessage(error.message, true);
+      });
+    }
+
+    function stopSession() {
+      const session = activeSession();
+      if (!session) return;
+      session.endedAt = new Date().toISOString();
+      activeSessionId = null;
+      pendingMqttRecordId = null;
+      saveState();
+      backupPayload("session-ended", session, { endedAt: session.endedAt });
+      setMessage(`${session.name} 已结束。下一条 MQTT 数据会自动开始新一轮。`);
+      render();
+    }
+
+    function addMark(label, groupName) {
+      const session = activeSession();
+      if (!session) {
+        setMessage("尚未开始测试，收到 MQTT 数据自动开始后再标注。", true);
+        return;
+      }
+      const mark = {
+        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        type: groupName,
+        label,
+        timestamp: new Date().toISOString(),
+        nearestMqttId: lastMqtt ? lastMqtt.id : "",
+        nearestMqttLoop: lastMqtt ? lastMqtt.loop : "",
+        nearestPhoneId: lastPhone ? lastPhone.id : ""
+      };
+      session.marks.push(mark);
+      saveState();
+      backupPayload("mark", session, mark);
+      setMessage(`已加入${groupName}：${label}`);
+      render();
+    }
+
+    function deleteSelectedSession() {
+      const session = selectedSession();
+      if (!session) {
+        setMessage("没有可删除的轮次。", true);
+        return;
+      }
+      if (!window.confirm(`确定删除 ${session.name} 的全部数据吗？`)) return;
+      state.sessions = state.sessions.filter((item) => item.id !== session.id);
+      if (activeSessionId === session.id) activeSessionId = null;
+      selectedSessionId = activeSessionId || state.sessions.at(-1)?.id || "";
+      saveState();
+      setMessage(`${session.name} 已删除。`);
+      render();
+    }
+
+    function updateRealtime() {
+      const active = activeSession();
+      els.activeSession.textContent = active ? active.name : "未开始";
+      els.stopButton.disabled = !active;
+      if (active) {
+        els.recordCount.textContent = `${active.mqttRecords.length} / ${active.phoneRecords.length}`;
+      }
+      if (lastMqtt) {
+        els.mqttLatitude.textContent = fixed(lastMqtt.latitude);
+        els.mqttLongitude.textContent = fixed(lastMqtt.longitude);
+        els.satelliteValue.textContent = `${displayValue(lastMqtt.visibleSatellites)}/${displayValue(lastMqtt.usedSatellites)}`;
+        els.onlineValue.textContent = `${displayValue(lastMqtt.onlineStatus)}/${displayValue(lastMqtt.fix)}`;
+        els.latestLevel.textContent = `${levelName(lastMqtt.level)} ${lastMqtt.alerts.length ? lastMqtt.alerts.join("、") : ""}`;
+        els.rawMqtt.textContent = `Topic: ${lastMqtt.topic}\n${JSON.stringify(lastMqtt.payload, null, 2)}`;
+      }
+      if (lastPhone) {
+        els.phoneLatitude.textContent = fixed(lastPhone.latitude);
+        els.phoneLongitude.textContent = fixed(lastPhone.longitude);
+        els.timeDelta.textContent = lastPhone.timeDeltaS == null ? "--" : `${lastPhone.timeDeltaS}s`;
+        els.distanceValue.textContent = lastPhone.distanceM == null ? "--" : `${lastPhone.distanceM}m`;
+      }
+    }
+
+    function levelName(level) {
+      if (level === "danger") return "异常";
+      if (level === "warn") return "关注";
+      return "正常";
+    }
+
+    function sortByTime(items, key = "timestamp") {
+      return [...items].sort((a, b) => toDate(a[key]) - toDate(b[key]));
+    }
+
+    function renderSessions() {
+      const current = selectedSessionId;
+      els.sessionSelect.innerHTML = "";
+      if (!state.sessions.length) {
+        const option = document.createElement("option");
+        option.value = "";
+        option.textContent = "暂无轮次";
+        els.sessionSelect.appendChild(option);
+        selectedSessionId = "";
+        return;
+      }
+      for (const session of state.sessions) {
+        const option = document.createElement("option");
+        option.value = session.id;
+        option.textContent = `${session.name} ${session.endedAt ? "(已结束)" : "(进行中)"}`;
+        els.sessionSelect.appendChild(option);
+      }
+      selectedSessionId = activeSessionId || (state.sessions.some((item) => item.id === current) ? current : state.sessions.at(-1).id);
+      els.sessionSelect.value = selectedSessionId;
+    }
+
+    function renderMqttTable(session) {
+      if (!session || !session.mqttRecords.length) {
+        els.mqttRecords.innerHTML = '<div class="empty">暂无 MQTT 数据。</div>';
+        return;
+      }
+      const rows = sortMqttByCollectionTime(session.mqttRecords).map((item) => `
+        <tr class="${item.level}">
+          <td>${formatDate(mqttTimeValue(item))}</td>
+          <td>${formatDate(item.receivedAt)}</td>
+          <td>${item.loop ?? ""}</td>
+          <td>${fixed(item.latitude)}</td>
+          <td>${fixed(item.longitude)}</td>
+          <td>${item.visibleSatellites ?? ""}</td>
+          <td>${item.usedSatellites ?? ""}</td>
+          <td>${item.hdop ?? ""}</td>
+          <td>${item.onlineStatus ?? ""}</td>
+          <td>${item.fix ?? ""}</td>
+          <td>${item.status ?? ""}</td>
+          <td>${item.event ?? ""}</td>
+          <td>${levelName(item.level)}</td>
+          <td>${item.alerts.join("；")}</td>
+        </tr>
+      `).join("");
+      els.mqttRecords.innerHTML = `
+        <table>
+          <thead><tr><th>采集时间</th><th>MQTT接收时间</th><th>Loop</th><th>纬度</th><th>经度</th><th>可见星</th><th>有效星</th><th>HDOP</th><th>在线</th><th>Fix</th><th>Status</th><th>Event</th><th>判定</th><th>自动识别</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    }
+
+    function renderPhoneTable(session) {
+      if (!session || !session.phoneRecords.length) {
+        els.phoneRecords.innerHTML = '<div class="empty">暂无手机定位数据。</div>';
+        return;
+      }
+      const rows = sortPhonesByCollectionTime(session.phoneRecords).map((item) => `
+        <tr class="${item.level}">
+          <td>${formatDate(phoneTimeValue(item))}</td>
+          <td>${item.geolocationTimestamp ? formatDate(item.geolocationTimestamp) : ""}</td>
+          <td>${fixed(item.latitude)}</td>
+          <td>${fixed(item.longitude)}</td>
+          <td>${Number.isFinite(Number(item.accuracy)) ? Number(item.accuracy).toFixed(1) : "--"}</td>
+          <td>${item.linkedMqttLoop ?? ""}</td>
+          <td>${item.timeDeltaS == null ? "" : item.timeDeltaS}</td>
+          <td>${item.distanceM == null ? "" : item.distanceM}</td>
+          <td>${levelName(item.level)}</td>
+          <td>${item.alerts.join("；")}</td>
+        </tr>
+      `).join("");
+      els.phoneRecords.innerHTML = `
+        <table>
+          <thead><tr><th>采集时间</th><th>系统定位时间</th><th>纬度</th><th>经度</th><th>精度(m)</th><th>对应MQTT Loop</th><th>时间差(s)</th><th>对标误差(m)</th><th>判定</th><th>自动识别</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    }
+
+    function renderMarkTable(session) {
+      if (!session || !session.marks.length) {
+        els.markRecords.innerHTML = '<div class="empty">暂无场景 / 动作标注。</div>';
+        return;
+      }
+      const rows = sortByTime(session.marks, "timestamp").map((item) => `
+        <tr>
+          <td>${formatDate(item.timestamp)}</td>
+          <td>${item.type}</td>
+          <td>${item.label}</td>
+          <td>${item.nearestMqttLoop ?? ""}</td>
+        </tr>
+      `).join("");
+      els.markRecords.innerHTML = `
+        <table>
+          <thead><tr><th>标注时间</th><th>类型</th><th>内容</th><th>最近MQTT Loop</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    }
+
+    function resizeTrajectoryCanvas() {
+      const canvas = els.trajectoryCanvas;
+      const rect = els.trajectoryWrap.getBoundingClientRect();
+      const ratio = window.devicePixelRatio || 1;
+      const width = Math.max(320, Math.round(rect.width));
+      const height = Math.max(260, Math.round(rect.height));
+      if (canvas.width !== Math.round(width * ratio) || canvas.height !== Math.round(height * ratio)) {
+        canvas.width = Math.round(width * ratio);
+        canvas.height = Math.round(height * ratio);
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+      }
+      return { width, height, ratio };
+    }
+
+    function drawPath(ctx, points, color, toScreen) {
+      if (points.length < 2) return;
+      ctx.beginPath();
+      points.forEach((point, index) => {
+        const screen = toScreen(point);
+        if (index === 0) ctx.moveTo(screen.x, screen.y);
+        else ctx.lineTo(screen.x, screen.y);
+      });
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2.5;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.stroke();
+    }
+
+    function niceMapStep(rawMeters) {
+      const value = Math.max(1, rawMeters);
+      const power = 10 ** Math.floor(Math.log10(value));
+      const normalized = value / power;
+      if (normalized <= 1) return power;
+      if (normalized <= 2) return 2 * power;
+      if (normalized <= 5) return 5 * power;
+      return 10 * power;
+    }
+
+    function drawMapBackground(ctx, width, height, worldToScreen, screenToWorld, metersPerPixel) {
+      ctx.fillStyle = "#f7fbf7";
+      ctx.fillRect(0, 0, width, height);
+
+      const topLeft = screenToWorld(0, 0);
+      const bottomRight = screenToWorld(width, height);
+      const minX = Math.min(topLeft.x, bottomRight.x);
+      const maxX = Math.max(topLeft.x, bottomRight.x);
+      const minY = Math.min(topLeft.y, bottomRight.y);
+      const maxY = Math.max(topLeft.y, bottomRight.y);
+      const step = niceMapStep(metersPerPixel * 86);
+
+      ctx.strokeStyle = "#dfe9dd";
+      ctx.lineWidth = 1;
+      ctx.font = "11px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
+      ctx.fillStyle = "#7a897c";
+      for (let x = Math.floor(minX / step) * step; x <= maxX; x += step) {
+        const screen = worldToScreen({ x, y: 0 });
+        ctx.beginPath();
+        ctx.moveTo(screen.x, 0);
+        ctx.lineTo(screen.x, height);
+        ctx.stroke();
+      }
+      for (let y = Math.floor(minY / step) * step; y <= maxY; y += step) {
+        const screen = worldToScreen({ x: 0, y });
+        ctx.beginPath();
+        ctx.moveTo(0, screen.y);
+        ctx.lineTo(width, screen.y);
+        ctx.stroke();
+      }
+
+      const scaleMeters = niceMapStep(metersPerPixel * 120);
+      const scalePx = scaleMeters / metersPerPixel;
+      const sx = 18;
+      const sy = height - 28;
+      ctx.strokeStyle = "#172033";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(sx + scalePx, sy);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy - 5);
+      ctx.lineTo(sx, sy + 5);
+      ctx.moveTo(sx + scalePx, sy - 5);
+      ctx.lineTo(sx + scalePx, sy + 5);
+      ctx.stroke();
+      ctx.fillStyle = "#172033";
+      ctx.fillText(`${scaleMeters} m`, sx, sy - 8);
+
+      ctx.save();
+      ctx.translate(width - 34, 34);
+      ctx.strokeStyle = "#172033";
+      ctx.fillStyle = "#172033";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, 18);
+      ctx.lineTo(0, -12);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, -16);
+      ctx.lineTo(-6, -5);
+      ctx.lineTo(6, -5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.font = "12px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
+      ctx.fillText("N", -4, 30);
+      ctx.restore();
+    }
+
+    function drawErrorConnectors(ctx, pairedPoints, toScreen) {
+      if (!pairedPoints.length) return;
+      ctx.save();
+      ctx.setLineDash?.([5, 5]);
+      ctx.strokeStyle = "rgba(130, 90, 30, 0.62)";
+      ctx.lineWidth = 1.4;
+      for (const pair of pairedPoints) {
+        const phone = toScreen(pair.phone);
+        const mqtt = toScreen(pair.mqtt);
+        ctx.beginPath();
+        ctx.moveTo(phone.x, phone.y);
+        ctx.lineTo(mqtt.x, mqtt.y);
+        ctx.stroke();
+      }
+      ctx.setLineDash?.([]);
+      ctx.restore();
+    }
+
+    function drawDirectionArrows(ctx, points, color, toScreen) {
+      if (points.length < 2) return;
+      const step = Math.max(1, Math.floor(points.length / 8));
+      for (let index = 1; index < points.length; index += step) {
+        const from = toScreen(points[index - 1]);
+        const to = toScreen(points[index]);
+        const angle = Math.atan2(to.y - from.y, to.x - from.x);
+        if (!Number.isFinite(angle) || Math.hypot(to.x - from.x, to.y - from.y) < 8) continue;
+        ctx.save();
+        ctx.translate(to.x, to.y);
+        ctx.rotate(angle);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(-9, -5);
+        ctx.lineTo(-9, 5);
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.globalAlpha = 0.86;
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    function drawPoint(ctx, point, color, radius, toScreen, stroke = "#ffffff") {
+      const screen = toScreen(point);
+      ctx.beginPath();
+      ctx.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = stroke;
+      ctx.stroke();
+      return screen;
+    }
+
+    function drawLatestMarker(ctx, point, toScreen) {
+      if (!point) return;
+      const screen = toScreen(point);
+      ctx.beginPath();
+      ctx.arc(screen.x, screen.y, 11, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(20, 115, 230, 0.12)";
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "#1473e6";
+      ctx.stroke();
+    }
+
+    function drawInvalidPoint(ctx, point, toScreen) {
+      const screen = toScreen(point);
+      ctx.beginPath();
+      ctx.arc(screen.x, screen.y, 5.5, 0, Math.PI * 2);
+      ctx.fillStyle = "#9aa3ad";
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "#ffffff";
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(screen.x - 4, screen.y - 4);
+      ctx.lineTo(screen.x + 4, screen.y + 4);
+      ctx.moveTo(screen.x + 4, screen.y - 4);
+      ctx.lineTo(screen.x - 4, screen.y + 4);
+      ctx.strokeStyle = "#5d687a";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      return screen;
+    }
+
+    function renderTrajectory(session, options = {}) {
+      const { reset = false, preserveView = true } = options;
+      const { width, height, ratio } = resizeTrajectoryCanvas();
+      const canvas = els.trajectoryCanvas;
+      const ctx = canvas.getContext("2d");
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      els.trajectoryPopup.classList.add("hidden");
+      trajectoryView.pointIndex = [];
+
+      const sessionChanged = trajectoryView.sessionId !== (session?.id || "");
+      if (sessionChanged || reset) {
+        trajectoryView.sessionId = session?.id || "";
+        trajectoryView.scale = 2.8;
+        trajectoryView.offsetX = 0;
+        trajectoryView.offsetY = 0;
+        trajectoryView.autoFollowPaused = false;
+      }
+
+      if (!session || (!session.phoneRecords.length && !session.mqttRecords.length)) {
+        ctx.fillStyle = "#697589";
+        ctx.font = "14px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
+        ctx.fillText("暂无轨迹数据。", 18, 32);
+        els.trajectorySummary.textContent = "等待可视化数据。";
+        trajectoryView.hasDrawing = false;
+        return;
+      }
+
+      const alignment = buildAlignedRecords(session);
+      const pairedRows = alignment.rows
+        .filter((row) => row.mqtt && isValidMqttPoint(row.mqtt) && isCoordinateFinite(row.phone))
+        .sort((a, b) => toDate(phoneTimeValue(a.phone)) - toDate(phoneTimeValue(b.phone)));
+      const mqttRecords = sortMqttByCollectionTime(session.mqttRecords);
+      const validMqttRecords = pairedRows.map((row) => row.mqtt);
+      const validMqttIds = new Set(validMqttRecords.map((record) => record.id));
+      const phoneRecords = sortPhonesByCollectionTime(session.phoneRecords).filter(isCoordinateFinite);
+      const validForOrigin = [...phoneRecords, ...validMqttRecords];
+      if (!validForOrigin.length) {
+        if (!trajectoryView.hasDrawing) {
+          ctx.fillStyle = "#697589";
+          ctx.font = "14px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
+          ctx.fillText("暂无可绘制的手机或 MQTT 坐标。", 18, 32);
+        }
+        els.trajectorySummary.textContent = "暂无可绘制的手机或 MQTT 坐标，原始数据仍在表格中保留。";
+        return;
+      }
+
+      const origin = {
+        lat: validForOrigin.reduce((sum, item) => sum + Number(item.latitude), 0) / validForOrigin.length,
+        lon: validForOrigin.reduce((sum, item) => sum + Number(item.longitude), 0) / validForOrigin.length
+      };
+      const pairedPoints = pairedRows.map((row) => ({
+        row,
+        phone: projectPoint(row.phone, origin),
+        mqtt: projectPoint(row.mqtt, origin)
+      }));
+      const phonePoints = phoneRecords.map((record) => projectPoint(record, origin));
+      const mqttPoints = pairedPoints.map((pair) => pair.mqtt);
+      const phoneByMqttId = alignment.byMqttId;
+      const invalidPoints = mqttRecords
+        .filter((record) => isMqttNanPoint(record) && !validMqttIds.has(record.id))
+        .map((record) => {
+          const aligned = phoneByMqttId.get(record.id);
+          const markerSource = aligned?.phone || phoneRecords.reduce((best, phone) => {
+            const delta = Math.abs(toDate(phoneTimeValue(phone)) - toDate(mqttTimeValue(record))) / 1000;
+            return delta <= MAX_VISUAL_TIME_DELTA_S && (!best || delta < best.delta) ? { phone, delta } : best;
+          }, null)?.phone;
+          return markerSource ? { ...projectPoint(markerSource, origin), record } : null;
+        })
+        .filter(Boolean);
+      const drawable = [...phonePoints, ...mqttPoints, ...invalidPoints];
+      const xs = drawable.map((point) => point.x);
+      const ys = drawable.map((point) => point.y);
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
+      const spanX = Math.max(1, maxX - minX);
+      const spanY = Math.max(1, maxY - minY);
+      const padding = 42;
+
+      trajectoryView.baseScale = Math.min((width - padding * 2) / spanX, (height - padding * 2) / spanY);
+      trajectoryView.centerX = (minX + maxX) / 2;
+      trajectoryView.centerY = (minY + maxY) / 2;
+
+      const latestPhonePoint = phonePoints.at(-1) || null;
+      const latestPair = pairedPoints.at(-1) || null;
+      const latestCenter = latestPair
+        ? {
+            x: (latestPair.phone.x + latestPair.mqtt.x) / 2,
+            y: (latestPair.phone.y + latestPair.mqtt.y) / 2,
+            record: latestPair.row.phone
+          }
+        : latestPhonePoint;
+      if (!preserveView || !trajectoryView.autoFollowPaused || sessionChanged || reset) {
+        const scale = trajectoryView.baseScale * trajectoryView.scale;
+        if (latestCenter && Number.isFinite(scale) && scale > 0) {
+          trajectoryView.offsetX = -(latestCenter.x - trajectoryView.centerX) * scale;
+          trajectoryView.offsetY = (latestCenter.y - trajectoryView.centerY) * scale;
+        }
+      }
+
+      const toScreen = (point) => {
+        const scale = trajectoryView.baseScale * trajectoryView.scale;
+        return {
+          x: width / 2 + (point.x - trajectoryView.centerX) * scale + trajectoryView.offsetX,
+          y: height / 2 - (point.y - trajectoryView.centerY) * scale + trajectoryView.offsetY
+        };
+      };
+      const screenToWorld = (x, y) => {
+        const scale = trajectoryView.baseScale * trajectoryView.scale;
+        return {
+          x: (x - width / 2 - trajectoryView.offsetX) / scale + trajectoryView.centerX,
+          y: trajectoryView.centerY - (y - height / 2 - trajectoryView.offsetY) / scale
+        };
+      };
+      const metersPerPixel = 1 / (trajectoryView.baseScale * trajectoryView.scale);
+
+      drawMapBackground(ctx, width, height, toScreen, screenToWorld, metersPerPixel);
+
+      drawErrorConnectors(ctx, pairedPoints, toScreen);
+      drawPath(ctx, phonePoints, "#d93025", toScreen);
+      drawPath(ctx, mqttPoints, "#1f6fb2", toScreen);
+      drawDirectionArrows(ctx, phonePoints, "#d93025", toScreen);
+      drawDirectionArrows(ctx, mqttPoints, "#1f6fb2", toScreen);
+      if (phonePoints.length >= 2) {
+        drawPath(ctx, phonePoints.slice(-2), "#111827", toScreen);
+      }
+      if (mqttPoints.length >= 2) {
+        drawPath(ctx, mqttPoints.slice(-2), "#7c3aed", toScreen);
+      }
+      phonePoints.forEach((point) => drawPoint(ctx, point, "#d93025", 3.8, toScreen));
+      mqttPoints.forEach((point) => {
+        const screen = drawPoint(ctx, point, "#1f6fb2", 5, toScreen);
+        const aligned = phoneByMqttId.get(point.record.id);
+        trajectoryView.pointIndex.push({
+          x: screen.x,
+          y: screen.y,
+          radius: 12,
+          record: point.record,
+          aligned,
+          eventState: eventStateForMqtt(session, point.record)
+        });
+      });
+      invalidPoints.forEach((point) => drawInvalidPoint(ctx, point, toScreen));
+      if (latestPair) {
+        drawLatestMarker(ctx, latestPair.phone, toScreen);
+        drawLatestMarker(ctx, latestPair.mqtt, toScreen);
+      } else {
+        drawLatestMarker(ctx, latestPhonePoint, toScreen);
+      }
+
+      const alignedCount = alignment.rows.filter((row) => row.mqtt).length;
+      const missingCount = alignment.rows.length - alignedCount;
+      els.trajectorySummary.textContent = `手机点 ${phonePoints.length} 个；${MAX_VISUAL_TIME_DELTA_S}s内对齐 ${alignedCount}/${alignment.rows.length} 条，超时不入图 ${missingCount} 条；MQTT有效点 ${validMqttRecords.length} 个，MQTT NaN点 ${invalidPoints.length} 个。`;
+      trajectoryView.hasDrawing = true;
+    }
+
+    function render() {
+      renderSessions();
+      const session = selectedSession();
+      updateRealtime();
+      if (!activeSession()) {
+        els.recordCount.textContent = session ? `${session.mqttRecords.length} / ${session.phoneRecords.length}` : "0 / 0";
+      }
+      renderMqttTable(session);
+      renderPhoneTable(session);
+      renderMarkTable(session);
+      renderTrajectory(session);
+    }
+
+    function selectedPayloadRows() {
+      const session = selectedSession();
+      if (!session) return [];
+      const rows = [];
+      for (const item of sortMqttByCollectionTime(session.mqttRecords)) {
+        rows.push({
+          source: "MQTT",
+          session: session.name,
+          caseName: session.caseName,
+          time: mqttTimeValue(item),
+          gnssUtcTime: item.gnssUtcTime || "",
+          mqttReceivedAt: item.receivedAt,
+          loop: item.loop,
+          latitude: item.latitude,
+          longitude: item.longitude,
+          accuracy: "",
+          visibleSatellites: item.visibleSatellites,
+          usedSatellites: item.usedSatellites,
+          hdop: item.hdop,
+          onlineStatus: item.onlineStatus,
+          fix: item.fix,
+          distanceM: "",
+          timeDeltaS: "",
+          level: levelName(item.level),
+          alerts: item.alerts.join(";")
+        });
+      }
+      for (const item of sortPhonesByCollectionTime(session.phoneRecords)) {
+        rows.push({
+          source: "PHONE",
+          session: session.name,
+          caseName: session.caseName,
+          time: phoneTimeValue(item),
+          loop: item.linkedMqttLoop,
+          latitude: item.latitude,
+          longitude: item.longitude,
+          accuracy: item.accuracy,
+          visibleSatellites: "",
+          usedSatellites: "",
+          hdop: "",
+          onlineStatus: "",
+          fix: "",
+          distanceM: item.distanceM,
+          timeDeltaS: item.timeDeltaS,
+          level: levelName(item.level),
+          alerts: item.alerts.join(";")
+        });
+      }
+      for (const item of sortByTime(session.marks, "timestamp")) {
+        rows.push({
+          source: "MARK",
+          session: session.name,
+          caseName: session.caseName,
+          time: item.timestamp,
+          loop: item.nearestMqttLoop,
+          latitude: "",
+          longitude: "",
+          accuracy: "",
+          visibleSatellites: "",
+          usedSatellites: "",
+          hdop: "",
+          onlineStatus: "",
+          fix: "",
+          distanceM: "",
+          timeDeltaS: "",
+          level: item.type,
+          alerts: item.label
+        });
+      }
+      return rows;
+    }
+
+    function sectionedCsvLines(session) {
+      const lines = [];
+      const addRows = (title, headers, rows) => {
+        lines.push(csvEscape(title));
+        lines.push(headers.map(csvEscape).join(","));
+        for (const row of rows) {
+          lines.push(headers.map((key) => csvEscape(row[key])).join(","));
+        }
+        lines.push("");
+      };
+
+      addRows(
+        "MQTT数据",
+        ["time", "gnssUtcTime", "mqttReceivedAt", "loop", "latitude", "longitude", "visibleSatellites", "usedSatellites", "hdop", "onlineStatus", "fix", "status", "event", "level", "alerts"],
+        sortMqttByCollectionTime(session.mqttRecords).map((item) => ({
+          time: mqttTimeValue(item),
+          gnssUtcTime: item.gnssUtcTime || "",
+          mqttReceivedAt: item.receivedAt,
+          loop: item.loop,
+          latitude: item.latitude,
+          longitude: item.longitude,
+          visibleSatellites: item.visibleSatellites,
+          usedSatellites: item.usedSatellites,
+          hdop: item.hdop,
+          onlineStatus: item.onlineStatus,
+          fix: item.fix,
+          status: item.status,
+          event: item.event,
+          level: levelName(item.level),
+          alerts: item.alerts.join(";")
+        }))
+      );
+
+      addRows(
+        "手机定位数据",
+        ["time", "geolocationTimestamp", "latitude", "longitude", "accuracy", "linkedMqttLoop", "timeDeltaS", "distanceM", "level", "alerts"],
+        sortPhonesByCollectionTime(session.phoneRecords).map((item) => ({
+          time: phoneTimeValue(item),
+          geolocationTimestamp: item.geolocationTimestamp || "",
+          latitude: item.latitude,
+          longitude: item.longitude,
+          accuracy: item.accuracy,
+          linkedMqttLoop: item.linkedMqttLoop,
+          timeDeltaS: item.timeDeltaS,
+          distanceM: item.distanceM,
+          level: levelName(item.level),
+          alerts: item.alerts.join(";")
+        }))
+      );
+
+      addRows(
+        "场景动作标注",
+        ["time", "type", "label", "nearestMqttLoop"],
+        sortByTime(session.marks, "timestamp").map((item) => ({
+          time: item.timestamp,
+          type: item.type,
+          label: item.label,
+          nearestMqttLoop: item.nearestMqttLoop
+        }))
+      );
+
+      return lines;
+    }
+
+    function downloadFile(filename, content, type) {
+      const blob = new Blob([content], { type });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function csvEscape(value) {
+      const text = value == null ? "" : String(value);
+      return `"${text.replace(/"/g, '""')}"`;
+    }
+
+    function exportCsv() {
+      const session = selectedSession();
+      if (!session) {
+        setMessage("所选轮次暂无可导出数据。", true);
+        return;
+      }
+      const hasData = session.mqttRecords.length || session.phoneRecords.length || session.marks.length;
+      if (!hasData) {
+        setMessage("所选轮次暂无可导出数据。", true);
+        return;
+      }
+      const lines = [
+        csvEscape("测试轮次") + "," + csvEscape(session.name),
+        csvEscape("测试工况") + "," + csvEscape(session.caseName),
+        csvEscape("开始时间") + "," + csvEscape(session.startedAt),
+        csvEscape("结束时间") + "," + csvEscape(session.endedAt || ""),
+        "",
+        ...sectionedCsvLines(session)
+      ];
+      downloadFile(`gnss-test-${Date.now()}.csv`, "\ufeff" + lines.join("\n"), "text/csv;charset=utf-8");
+    }
+
+    function exportJson() {
+      const session = selectedSession();
+      if (!session) {
+        setMessage("所选轮次暂无可导出数据。", true);
+        return;
+      }
+      downloadFile(`gnss-test-${Date.now()}.json`, JSON.stringify(session, null, 2), "application/json;charset=utf-8");
+    }
+
+    function renderTrajectoryWithCurrentView() {
+      renderTrajectory(selectedSession(), { preserveView: true });
+    }
+
+    function showTrajectoryPopup(point, x, y) {
+      const precision = hdopPrecisionPercent(point.record.hdop);
+      const distance = point.aligned?.distanceM;
+      const timeDelta = point.aligned?.timeDeltaS;
+      const phone = point.aligned?.phone || null;
+      const phoneTime = phone ? phoneTimeValue(phone) : "";
+      const delta = phone ? coordinateDeltaMeters(phone, point.record) : null;
+      els.trajectoryPopup.innerHTML = `
+        <strong>MQTT Loop ${point.record.loop || "--"}</strong>
+        <div>HDOP 精度指标：${precision == null ? "NaN" : `${precision}%`}</div>
+        <div>Haversine 误差：${distance == null ? "NaN" : `${distance} m`}</div>
+        <div>东西/南北误差：${delta ? `${delta.eastM} m / ${delta.northM} m` : "NaN"}</div>
+        <div>时间差：${timeDelta == null ? "NaN" : `${timeDelta}s`}</div>
+        <div>手机经纬度：${phone ? `${fixed(phone.latitude, 7)}, ${fixed(phone.longitude, 7)}` : "NaN"}</div>
+        <div>GNSS经纬度：${fixed(point.record.latitude, 7)}, ${fixed(point.record.longitude, 7)}</div>
+        <div>事件状态：${point.eventState}</div>
+        <div>有效卫星数：${point.record.usedSatellites || "NaN"}</div>
+        <div>GNSS采集时间：${formatDate(mqttTimeValue(point.record))}</div>
+        <div>手机采集时间：${formatDate(phoneTime)}</div>
+      `;
+      const rect = els.trajectoryWrap.getBoundingClientRect();
+      const popupWidth = 260;
+      const left = Math.min(Math.max(10, x + 12), rect.width - popupWidth - 10);
+      const top = Math.min(Math.max(10, y + 12), rect.height - 150);
+      els.trajectoryPopup.style.left = `${left}px`;
+      els.trajectoryPopup.style.top = `${top}px`;
+      els.trajectoryPopup.classList.remove("hidden");
+    }
+
+    function handleTrajectoryClick(event) {
+      const rect = els.trajectoryCanvas.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      const hit = trajectoryView.pointIndex.find((point) => Math.hypot(point.x - x, point.y - y) <= point.radius);
+      if (hit) {
+        showTrajectoryPopup(hit, x, y);
+      } else {
+        els.trajectoryPopup.classList.add("hidden");
+      }
+    }
+
+    function handleTrajectoryWheel(event) {
+      event.preventDefault();
+      const factor = event.deltaY < 0 ? 1.18 : 0.85;
+      trajectoryView.scale = Math.max(0.25, Math.min(24, trajectoryView.scale * factor));
+      renderTrajectoryWithCurrentView();
+    }
+
+    function beginTrajectoryDrag(event) {
+      trajectoryView.autoFollowPaused = true;
+      trajectoryView.isDragging = true;
+      trajectoryView.dragStartX = event.clientX;
+      trajectoryView.dragStartY = event.clientY;
+      trajectoryView.dragOffsetX = trajectoryView.offsetX;
+      trajectoryView.dragOffsetY = trajectoryView.offsetY;
+      els.trajectoryCanvas.classList.add("dragging");
+      els.trajectoryCanvas.setPointerCapture?.(event.pointerId);
+    }
+
+    function moveTrajectoryDrag(event) {
+      if (!trajectoryView.isDragging) return;
+      trajectoryView.offsetX = trajectoryView.dragOffsetX + event.clientX - trajectoryView.dragStartX;
+      trajectoryView.offsetY = trajectoryView.dragOffsetY + event.clientY - trajectoryView.dragStartY;
+      renderTrajectoryWithCurrentView();
+    }
+
+    function endTrajectoryDrag(event) {
+      if (!trajectoryView.isDragging) return;
+      trajectoryView.isDragging = false;
+      els.trajectoryCanvas.classList.remove("dragging");
+      els.trajectoryCanvas.releasePointerCapture?.(event.pointerId);
+    }
+
+    function zoomTrajectory(factor) {
+      trajectoryView.scale = Math.max(0.25, Math.min(24, trajectoryView.scale * factor));
+      renderTrajectoryWithCurrentView();
+    }
+
+    function initOptions() {
+      els.backupModeSelect.value = backupMode;
+      els.backupUrlInput.value = backupUrl;
+      els.supabaseUrlInput.value = supabaseUrl;
+      els.supabaseKeyInput.value = supabaseAnonKey;
+      if (backupMode === "supabase") {
+        setBackupStatus(supabaseUrl && supabaseAnonKey
+          ? `Supabase 备份已开启：${supabaseUrl}`
+          : "Supabase 备份配置不完整，请填写 Project URL 和 anon key。", !(supabaseUrl && supabaseAnonKey));
+      } else if (backupMode === "post" && backupUrl) {
+        setBackupStatus(`自定义 POST 备份已开启：${backupUrl}`);
+      } else {
+        setBackupStatus("远程备份默认关闭；不填写地址时不会上传任何数据。");
+      }
+      for (const item of testCases) {
+        const option = document.createElement("option");
+        option.value = item;
+        option.textContent = item;
+        els.caseSelect.appendChild(option);
+      }
+      for (const group of eventGroups) {
+        const section = document.createElement("section");
+        section.className = "event-group";
+        const title = document.createElement("h3");
+        title.textContent = group.name;
+        const chips = document.createElement("div");
+        chips.className = "chips";
+        for (const label of group.items) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = label;
+          button.addEventListener("click", () => addMark(label, group.name));
+          chips.appendChild(button);
+        }
+        section.appendChild(title);
+        section.appendChild(chips);
+        els.eventGroups.appendChild(section);
+      }
+    }
+
+    els.stopButton.addEventListener("click", stopSession);
+    els.phoneButton.addEventListener("click", () => requestPhoneLocation("manual"));
+    els.mqttButton.addEventListener("click", connectMqtt);
+    els.exportCsvButton.addEventListener("click", exportCsv);
+    els.exportJsonButton.addEventListener("click", exportJson);
+    els.deleteButton.addEventListener("click", deleteSelectedSession);
+    els.saveBackupButton.addEventListener("click", saveBackupUrl);
+    els.testBackupButton.addEventListener("click", testBackup);
+    els.zoomInButton.addEventListener("click", () => zoomTrajectory(1.25));
+    els.zoomOutButton.addEventListener("click", () => zoomTrajectory(0.8));
+    els.resetViewButton.addEventListener("click", () => renderTrajectory(selectedSession(), { reset: true, preserveView: false }));
+    els.trajectoryCanvas.addEventListener("click", handleTrajectoryClick);
+    els.trajectoryCanvas.addEventListener("wheel", handleTrajectoryWheel, { passive: false });
+    els.trajectoryCanvas.addEventListener("pointerdown", beginTrajectoryDrag);
+    els.trajectoryCanvas.addEventListener("pointermove", moveTrajectoryDrag);
+    els.trajectoryCanvas.addEventListener("pointerup", endTrajectoryDrag);
+    els.trajectoryCanvas.addEventListener("pointercancel", endTrajectoryDrag);
+    window.addEventListener("resize", () => renderTrajectory(selectedSession(), { preserveView: true }));
+    els.sessionSelect.addEventListener("change", () => {
+      selectedSessionId = els.sessionSelect.value;
+      render();
+    });
+
+    initOptions();
+    els.mqttTopicInput.value = els.mqttTopicInput.value.trim() || DEFAULT_MQTT_TOPIC;
+    render();
+  </script>
+</body>
+</html>
